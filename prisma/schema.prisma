@@ -1,0 +1,49 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum AbsenzTyp {
+  FERIEN
+  KRANK
+  FEIERTAG
+  SONSTIGES
+}
+
+model Zeiteintrag {
+  id           String   @id @default(cuid())
+  datum        DateTime @db.Date
+  startzeit    DateTime @db.Time(0)
+  endzeit      DateTime @db.Time(0)
+  pauseDauer   Int
+  effektivzeit Int
+  notiz        String?
+  erstelltAm   DateTime @default(now())
+  aktualisiertAm DateTime @updatedAt
+
+  @@index([datum])
+  @@index([erstelltAm])
+}
+
+model Absenz {
+  id           String    @id @default(cuid())
+  datum        DateTime  @db.Date
+  typ          AbsenzTyp
+  bezeichnung  String?
+  erstelltAm   DateTime  @default(now())
+  aktualisiertAm DateTime @updatedAt
+
+  @@index([datum])
+  @@index([typ])
+}
+
+model Einstellung {
+  id                       String   @id @default("singleton")
+  sollstundenProWoche      Float    @default(42.0)
+  ueberstundenSaldoMinuten Int      @default(0)
+  aktualisiertAm           DateTime @updatedAt
+}

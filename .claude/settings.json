@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install)",
+      "Bash(npm install:*)",
+      "Bash(npm run dev:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm run lint:*)",
+      "Bash(npm run start:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git tag:*)",
+      "Bash(git log:*)",
+      "Bash(git ls-files:*)",
+      "Bash(lsof:*)",
+      "Bash(kill:*)",
+      "Bash(npx shadcn@latest add:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(npx eslint:*)",
+      "Skill(deploy)",
+      "Skill(deploy:*)",
+      "Bash(git diff:*)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\nikka\\OneDrive\\Dokumente\\ClaudeCode\\ERP\\src\\app\\api\\quotes\\[id]",
+      "c:\\Users\\nikka\\OneDrive\\Dokumente\\ClaudeCode\\ERP\\src\\app\\api\\invoices\\[id]"
+    ]
+  }
+}
