@@ -11,6 +11,15 @@ const geist = Geist({
 export const metadata: Metadata = {
   title: "Zeit – Zeiterfassung",
   description: "Persönliche Zeiterfassung",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Zeit",
+  },
+  other: {
+    "mobile-web-app-capable": "yes",
+  },
 };
 
 export default function RootLayout({
