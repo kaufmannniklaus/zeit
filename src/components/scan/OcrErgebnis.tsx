@@ -94,7 +94,7 @@ export function OcrErgebnis({ ergebnis }: OcrErgebnisProps) {
         )}
 
         <Accordion>
-          <AccordionItem>
+          <AccordionItem value="rohtext">
             <AccordionTrigger>Rohen OCR-Text anzeigen</AccordionTrigger>
             <AccordionContent>
               <pre className="whitespace-pre-wrap rounded-lg bg-muted p-4 font-mono text-xs">

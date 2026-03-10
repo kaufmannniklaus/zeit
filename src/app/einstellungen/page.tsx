@@ -65,15 +65,30 @@ export default function EinstellungenPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto py-6 px-4">
-        <p className="text-muted-foreground">Einstellungen werden geladen...</p>
+      <div className="container mx-auto py-8 px-4">
+        <h1 className="text-3xl font-bold mb-6 tracking-tight">Einstellungen</h1>
+        <Card className="max-w-md">
+          <CardHeader>
+            <CardTitle>Arbeitszeit-Konfiguration</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div className="space-y-2">
+              <div className="h-4 w-40 animate-pulse rounded bg-muted" />
+              <div className="h-10 w-full animate-pulse rounded bg-muted" />
+            </div>
+            <div className="space-y-2">
+              <div className="h-4 w-56 animate-pulse rounded bg-muted" />
+              <div className="h-10 w-full animate-pulse rounded bg-muted" />
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto py-6 px-4">
-      <h1 className="text-2xl font-bold mb-6">Einstellungen</h1>
+    <div className="container mx-auto py-8 px-4">
+      <h1 className="text-3xl font-bold mb-6 tracking-tight">Einstellungen</h1>
 
       <Card className="max-w-md">
         <CardHeader>

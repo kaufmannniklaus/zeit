@@ -119,8 +119,8 @@ export function AbgleichTabelle({
             <TableBody>
               {zeilen.map((z) => {
                 let rowClass = "";
-                if (z.keineErfasst) rowClass = "bg-red-50";
-                else if (z.keineOcr) rowClass = "bg-orange-50";
+                if (z.keineErfasst) rowClass = "bg-red-50 dark:bg-red-950/30";
+                else if (z.keineOcr) rowClass = "bg-orange-50 dark:bg-orange-950/30";
 
                 return (
                   <TableRow key={z.index} className={rowClass}>
@@ -136,7 +136,7 @@ export function AbgleichTabelle({
                     <TableCell
                       className={
                         z.startAbweichung
-                          ? "bg-yellow-50 text-yellow-900"
+                          ? "bg-yellow-50 text-yellow-900 dark:bg-yellow-950/30 dark:text-yellow-200"
                           : ""
                       }
                     >
@@ -145,7 +145,7 @@ export function AbgleichTabelle({
                     <TableCell
                       className={
                         z.endAbweichung
-                          ? "bg-yellow-50 text-yellow-900"
+                          ? "bg-yellow-50 text-yellow-900 dark:bg-yellow-950/30 dark:text-yellow-200"
                           : ""
                       }
                     >
@@ -165,7 +165,7 @@ export function AbgleichTabelle({
             </AlertDescription>
           </Alert>
         ) : (
-          <Alert className="border-green-200 bg-green-50 text-green-900">
+          <Alert className="border-green-200 bg-green-50 text-green-900 dark:border-green-800 dark:bg-green-950/30 dark:text-green-200">
             <AlertDescription>Keine Abweichungen gefunden</AlertDescription>
           </Alert>
         )}

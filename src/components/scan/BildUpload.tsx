@@ -186,10 +186,10 @@ export function BildUpload({ onOcrComplete }: BildUploadProps) {
 
         {loading && (
           <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">
-              Bild wird analysiert...
+            <p className="text-sm text-muted-foreground animate-pulse">
+              Bild wird analysiert -- dies kann einige Sekunden dauern...
             </p>
-            <Progress value={null} className="animate-pulse" />
+            <Progress value={null} />
           </div>
         )}
 

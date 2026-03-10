@@ -75,14 +75,12 @@ export function ScanClient() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 p-4 md:p-6 lg:p-8">
+    <div className="max-w-4xl space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight md:text-3xl">
-          Scan-Abgleich
-        </h1>
-        <p className="mt-1 text-muted-foreground">
-          Laden Sie ein Bild Ihrer Zeiterfassung hoch und vergleichen Sie die
-          erkannten Zeiten mit Ihren erfassten Eintraegen.
+        <h1 className="text-3xl font-bold tracking-tight">Scan-Abgleich</h1>
+        <p className="mt-2 text-muted-foreground">
+          Lade ein Bild deiner Zeiterfassung hoch und vergleiche die
+          erkannten Zeiten mit deinen erfassten Eintraegen.
         </p>
       </div>
 

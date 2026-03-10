@@ -70,16 +70,43 @@ export default function AbsenzenTabelle({
   }
 
   if (loading) {
-    return <p className="text-muted-foreground py-4">Absenzen werden geladen...</p>;
+    return (
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Datum</TableHead>
+              <TableHead>Typ</TableHead>
+              <TableHead>Bezeichnung</TableHead>
+              <TableHead className="text-right">Aktionen</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {Array.from({ length: 3 }).map((_, i) => (
+              <TableRow key={i}>
+                {Array.from({ length: 4 }).map((_, j) => (
+                  <TableCell key={j}>
+                    <div className="h-4 w-16 animate-pulse rounded bg-muted" />
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    );
   }
 
   if (absenzen.length === 0) {
     return (
-      <p className="text-muted-foreground py-4">Keine Absenzen vorhanden.</p>
+      <p className="text-center text-muted-foreground py-8">
+        Keine Absenzen vorhanden.
+      </p>
     );
   }
 
   return (
+    <div className="rounded-md border">
     <Table>
       <TableHeader>
         <TableRow>
@@ -139,5 +166,6 @@ export default function AbsenzenTabelle({
         })}
       </TableBody>
     </Table>
+    </div>
   );
 }

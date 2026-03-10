@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import type { Absenz, KpiDaten } from "@/types";
 import KpiKarte from "@/components/dashboard/KpiKarte";
 import AbsenzenForm from "@/components/dashboard/AbsenzenForm";
@@ -18,17 +19,18 @@ export default function DashboardClient() {
   const [absenzen, setAbsenzen] = useState<Absenz[]>([]);
   const [loadingKpis, setLoadingKpis] = useState(true);
   const [loadingAbsenzen, setLoadingAbsenzen] = useState(true);
+  const [errorKpis, setErrorKpis] = useState<string | null>(null);
 
   const loadKpis = useCallback(async () => {
     setLoadingKpis(true);
+    setErrorKpis(null);
     try {
       const res = await fetch("/api/kpis");
-      if (res.ok) {
-        const json = await res.json();
-        setKpis(json.data);
-      }
+      if (!res.ok) throw new Error("KPIs konnten nicht geladen werden");
+      const json = await res.json();
+      setKpis(json.data);
     } catch {
-      console.error("Fehler beim Laden der KPIs");
+      setErrorKpis("KPIs konnten nicht geladen werden. Bitte Seite neu laden.");
     } finally {
       setLoadingKpis(false);
     }
@@ -43,7 +45,7 @@ export default function DashboardClient() {
         setAbsenzen(json.data);
       }
     } catch {
-      console.error("Fehler beim Laden der Absenzen");
+      // Fehler wird in der Tabelle behandelt
     } finally {
       setLoadingAbsenzen(false);
     }
@@ -59,9 +61,10 @@ export default function DashboardClient() {
       const res = await fetch(`/api/absenzen/${id}`, { method: "DELETE" });
       if (res.ok) {
         setAbsenzen((prev) => prev.filter((a) => a.id !== id));
+        loadKpis();
       }
     } catch {
-      console.error("Fehler beim Loeschen der Absenz");
+      // Fehler wird still behandelt
     }
   }
 
@@ -70,14 +73,15 @@ export default function DashboardClient() {
     loadKpis();
   }
 
-  const ueberstundenFarbe =
+  // Gruen = positiv (mehr gearbeitet als Soll), Rot = negativ (Minusstunden)
+  const ueberstundenFarbe: "gruen" | "rot" | "standard" =
     kpis && kpis.ueberstundenMinuten > 0
       ? "gruen"
       : kpis && kpis.ueberstundenMinuten < 0
         ? "rot"
         : "standard";
 
-  // CZV-1 Ampel
+  // CZV-1 Ampel: gruen >= Soll, gelb < Soll, rot = 0
   const czv1Farbe: "gruen" | "gelb" | "rot" =
     !kpis || kpis.erlaubteMinutenNaechsteWoche === 0
       ? "rot"
@@ -87,34 +91,45 @@ export default function DashboardClient() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Dashboard</h1>
+      <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+
+      {errorKpis && (
+        <Alert variant="destructive">
+          <AlertDescription>{errorKpis}</AlertDescription>
+        </Alert>
+      )}
 
       {/* KPI Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div
+        className="grid grid-cols-2 lg:grid-cols-3 gap-4"
+        aria-label="Kennzahlen"
+      >
         <KpiKarte
           titel="Ueberstunden"
           wert={
-            loadingKpis || !kpis ? "..." : formatMinuten(kpis.ueberstundenMinuten)
+            loadingKpis || !kpis
+              ? "..."
+              : formatMinuten(kpis.ueberstundenMinuten)
           }
-          farbe={loadingKpis || !kpis ? "standard" : (ueberstundenFarbe as "gruen" | "rot" | "standard")}
+          farbe={
+            loadingKpis || !kpis ? "standard" : ueberstundenFarbe
+          }
         />
         <KpiKarte
-          titel="Oe Woche"
+          titel="Durchschnitt / Woche"
           wert={
             loadingKpis || !kpis
               ? "..."
               : formatMinuten(kpis.durchschnittWocheMinuten)
           }
-          untertitel="Durchschnitt pro Woche"
         />
         <KpiKarte
-          titel="Oe Tag"
+          titel="Durchschnitt / Tag"
           wert={
             loadingKpis || !kpis
               ? "..."
               : formatMinuten(kpis.durchschnittTagMinuten)
           }
-          untertitel="Durchschnitt pro Tag"
         />
         <KpiKarte
           titel="26-Wochen-Schnitt"
@@ -133,7 +148,15 @@ export default function DashboardClient() {
               : formatMinuten(kpis.erlaubteMinutenNaechsteWoche)
           }
           farbe={loadingKpis || !kpis ? "standard" : czv1Farbe}
-          untertitel={czv1Farbe === "rot" ? "Muss Woche frei nehmen!" : czv1Farbe === "gelb" ? "Unter Sollstunden" : "CZV 1 OK"}
+          untertitel={
+            loadingKpis || !kpis
+              ? undefined
+              : czv1Farbe === "rot"
+                ? "Muss Woche frei nehmen!"
+                : czv1Farbe === "gelb"
+                  ? "Unter Sollstunden"
+                  : "CZV-1 OK"
+          }
         />
         <KpiKarte
           titel="Sollstunden / Woche"
@@ -145,18 +168,19 @@ export default function DashboardClient() {
         />
       </div>
 
-      {/* Absenzen Form */}
-      <AbsenzenForm onSuccess={handleAbsenzSuccess} />
+      {/* Absenzen Bereich */}
+      <section aria-label="Absenzen">
+        <AbsenzenForm onSuccess={handleAbsenzSuccess} />
 
-      {/* Absenzen Tabelle */}
-      <div>
-        <h2 className="text-lg font-semibold mb-2">Absenzen</h2>
-        <AbsenzenTabelle
-          absenzen={absenzen}
-          onDelete={handleDeleteAbsenz}
-          loading={loadingAbsenzen}
-        />
-      </div>
+        <div className="mt-6">
+          <h2 className="text-lg font-semibold mb-3">Absenzen</h2>
+          <AbsenzenTabelle
+            absenzen={absenzen}
+            onDelete={handleDeleteAbsenz}
+            loading={loadingAbsenzen}
+          />
+        </div>
+      </section>
     </div>
   );
 }

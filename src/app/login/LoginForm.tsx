@@ -47,10 +47,10 @@ export default function LoginForm() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle className="text-2xl text-center">⏱ Zeit</CardTitle>
-          <p className="text-sm text-muted-foreground text-center">
-            Persönliche Zeiterfassung
+        <CardHeader className="text-center">
+          <CardTitle className="text-2xl tracking-tight">Zeit</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Persoenliche Zeiterfassung
           </p>
         </CardHeader>
         <CardContent>
