@@ -71,10 +71,10 @@ export default function AbsenzenTabelle({
 
   if (loading) {
     return (
-      <div className="rounded-md border">
+      <div className="rounded-lg border shadow-sm overflow-hidden">
         <Table>
           <TableHeader>
-            <TableRow>
+            <TableRow className="bg-muted/40 hover:bg-muted/40">
               <TableHead>Datum</TableHead>
               <TableHead>Typ</TableHead>
               <TableHead>Bezeichnung</TableHead>
@@ -99,17 +99,17 @@ export default function AbsenzenTabelle({
 
   if (absenzen.length === 0) {
     return (
-      <p className="text-center text-muted-foreground py-8">
+      <p className="text-center text-sm text-muted-foreground py-10">
         Keine Absenzen vorhanden.
       </p>
     );
   }
 
   return (
-    <div className="rounded-md border">
+    <div className="rounded-lg border shadow-sm overflow-hidden">
     <Table>
       <TableHeader>
-        <TableRow>
+        <TableRow className="bg-muted/40 hover:bg-muted/40">
           <TableHead>Datum</TableHead>
           <TableHead>Typ</TableHead>
           <TableHead>Bezeichnung</TableHead>

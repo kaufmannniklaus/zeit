@@ -63,92 +63,94 @@ export default function EinstellungenPage() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="container mx-auto py-8 px-4">
-        <h1 className="text-3xl font-bold mb-6 tracking-tight">Einstellungen</h1>
-        <Card className="max-w-md">
-          <CardHeader>
-            <CardTitle>Arbeitszeit-Konfiguration</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            <div className="space-y-2">
-              <div className="h-4 w-40 animate-pulse rounded bg-muted" />
-              <div className="h-10 w-full animate-pulse rounded bg-muted" />
-            </div>
-            <div className="space-y-2">
-              <div className="h-4 w-56 animate-pulse rounded bg-muted" />
-              <div className="h-10 w-full animate-pulse rounded bg-muted" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  const skeletonContent = (
+    <Card className="max-w-md shadow-sm">
+      <CardHeader>
+        <CardTitle>Arbeitszeit-Konfiguration</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        <div className="space-y-2">
+          <div className="h-4 w-40 animate-pulse rounded bg-muted" />
+          <div className="h-10 w-full animate-pulse rounded bg-muted" />
+        </div>
+        <div className="space-y-2">
+          <div className="h-4 w-56 animate-pulse rounded bg-muted" />
+          <div className="h-10 w-full animate-pulse rounded bg-muted" />
+        </div>
+      </CardContent>
+    </Card>
+  );
 
   return (
-    <div className="container mx-auto py-8 px-4">
-      <h1 className="text-3xl font-bold mb-6 tracking-tight">Einstellungen</h1>
+    <div>
+      <div className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur-sm px-6 py-4">
+        <h1 className="text-xl font-semibold tracking-tight">Einstellungen</h1>
+      </div>
+      <div className="p-6">
+        {loading ? (
+          skeletonContent
+        ) : (
+          <Card className="max-w-md shadow-sm">
+            <CardHeader>
+              <CardTitle>Arbeitszeit-Konfiguration</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSave} className="space-y-5">
+                <div className="space-y-2">
+                  <Label htmlFor="sollstunden">Sollstunden pro Woche</Label>
+                  <Input
+                    id="sollstunden"
+                    type="number"
+                    step={0.5}
+                    min={1}
+                    max={60}
+                    value={sollstunden}
+                    onChange={(e) => setSollstunden(Number(e.target.value))}
+                    required
+                  />
+                </div>
 
-      <Card className="max-w-md">
-        <CardHeader>
-          <CardTitle>Arbeitszeit-Konfiguration</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSave} className="space-y-5">
-            <div className="space-y-2">
-              <Label htmlFor="sollstunden">Sollstunden pro Woche</Label>
-              <Input
-                id="sollstunden"
-                type="number"
-                step={0.5}
-                min={1}
-                max={60}
-                value={sollstunden}
-                onChange={(e) => setSollstunden(Number(e.target.value))}
-                required
-              />
-            </div>
+                <div className="space-y-2">
+                  <Label htmlFor="saldo">
+                    Überstunden-Anfangssaldo (Stunden)
+                  </Label>
+                  <Input
+                    id="saldo"
+                    type="number"
+                    step={0.25}
+                    min={-500}
+                    max={500}
+                    value={saldoStunden}
+                    onChange={(e) => setSaldoStunden(Number(e.target.value))}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Überstundensaldo aus dem Firmenauszug – wird zum berechneten
+                    Saldo addiert. Negativ = Minusstunden.
+                  </p>
+                </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="saldo">
-                Überstunden-Anfangssaldo (Stunden)
-              </Label>
-              <Input
-                id="saldo"
-                type="number"
-                step={0.25}
-                min={-500}
-                max={500}
-                value={saldoStunden}
-                onChange={(e) => setSaldoStunden(Number(e.target.value))}
-              />
-              <p className="text-xs text-muted-foreground">
-                Überstundensaldo aus dem Firmenauszug – wird zum berechneten
-                Saldo addiert. Negativ = Minusstunden.
-              </p>
-            </div>
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
 
-            {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
+                {success && (
+                  <Alert>
+                    <AlertDescription>
+                      Einstellungen erfolgreich gespeichert.
+                    </AlertDescription>
+                  </Alert>
+                )}
 
-            {success && (
-              <Alert>
-                <AlertDescription>
-                  Einstellungen erfolgreich gespeichert.
-                </AlertDescription>
-              </Alert>
-            )}
-
-            <Button type="submit" disabled={saving}>
-              {saving ? "Speichern..." : "Speichern"}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+                <Button type="submit" disabled={saving}>
+                  {saving ? "Speichern..." : "Speichern"}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </div>
   );
 }

@@ -2,9 +2,13 @@ import { ZeiterfassungClient } from "@/components/zeiterfassung/ZeiterfassungCli
 
 export default function ZeiterfassungPage() {
   return (
-    <div className="container mx-auto py-8 px-4">
-      <h1 className="text-3xl font-bold mb-6 tracking-tight">Zeiterfassung</h1>
-      <ZeiterfassungClient />
+    <div>
+      <div className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur-sm px-6 py-4">
+        <h1 className="text-xl font-semibold tracking-tight">Zeiterfassung</h1>
+      </div>
+      <div className="p-6">
+        <ZeiterfassungClient />
+      </div>
     </div>
   );
 }

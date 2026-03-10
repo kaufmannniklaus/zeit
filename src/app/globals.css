@@ -131,4 +131,21 @@
     @apply font-sans;
     scroll-behavior: smooth;
   }
+  ::selection {
+    background-color: oklch(0.55 0.22 264 / 15%);
+  }
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: oklch(0.75 0 0);
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.55 0.22 264);
+  }
 }

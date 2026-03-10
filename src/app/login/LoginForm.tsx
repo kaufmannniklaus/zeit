@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Clock } from "lucide-react";
 
 export default function LoginForm() {
   const searchParams = useSearchParams();
@@ -35,7 +36,8 @@ export default function LoginForm() {
 
       // Nur relative Pfade erlaubt (Open-Redirect-Schutz)
       const raw = searchParams.get("redirect") || "/zeiterfassung";
-      const redirect = raw.startsWith("/") && !raw.startsWith("//") ? raw : "/zeiterfassung";
+      const redirect =
+        raw.startsWith("/") && !raw.startsWith("//") ? raw : "/zeiterfassung";
       window.location.href = redirect;
     } catch {
       setFehler("Verbindungsfehler. Bitte versuche es erneut.");
@@ -45,51 +47,63 @@ export default function LoginForm() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl tracking-tight">Zeit</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Persoenliche Zeiterfassung
+    <div className="min-h-screen flex items-center justify-center p-4 bg-sidebar">
+      <div className="w-full max-w-sm">
+        {/* Logo & App-Name */}
+        <div className="flex flex-col items-center mb-8">
+          <div className="w-16 h-16 rounded-2xl bg-sidebar-primary flex items-center justify-center mb-5 shadow-lg">
+            <Clock className="h-8 w-8 text-sidebar-primary-foreground" />
+          </div>
+          <h1 className="text-2xl font-bold text-sidebar-foreground tracking-tight">
+            Zeit
+          </h1>
+          <p className="text-sm text-sidebar-foreground/50 mt-1">
+            Persönliche Zeiterfassung
           </p>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleLogin} className="space-y-4">
-            {fehler && (
-              <Alert variant="destructive">
-                <AlertDescription>{fehler}</AlertDescription>
-              </Alert>
-            )}
-            <div className="space-y-2">
-              <Label htmlFor="username">Benutzername</Label>
-              <Input
-                id="username"
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                autoComplete="username"
-                required
-                disabled={loading}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Passwort</Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete="current-password"
-                required
-                disabled={loading}
-              />
-            </div>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Anmelden…" : "Anmelden"}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+        </div>
+
+        {/* Login Card */}
+        <Card className="shadow-2xl border-0">
+          <CardContent className="p-6 pt-6">
+            <form onSubmit={handleLogin} className="space-y-4">
+              {fehler && (
+                <Alert variant="destructive">
+                  <AlertDescription>{fehler}</AlertDescription>
+                </Alert>
+              )}
+              <div className="space-y-2">
+                <Label htmlFor="username">Benutzername</Label>
+                <Input
+                  id="username"
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  autoComplete="username"
+                  required
+                  disabled={loading}
+                  placeholder="Benutzername"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Passwort</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="current-password"
+                  required
+                  disabled={loading}
+                  placeholder="••••••••"
+                />
+              </div>
+              <Button type="submit" className="w-full mt-2" disabled={loading}>
+                {loading ? "Anmelden…" : "Anmelden"}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

@@ -62,10 +62,10 @@ export function ZeiteintraegeTabelle({
 }: ZeiteintraegeProps) {
   if (loading) {
     return (
-      <div className="rounded-md border">
+      <div className="rounded-lg border shadow-sm overflow-hidden">
         <Table>
           <TableHeader>
-            <TableRow>
+            <TableRow className="bg-muted/40 hover:bg-muted/40">
               <TableHead>Datum</TableHead>
               <TableHead>Von</TableHead>
               <TableHead>Bis</TableHead>
@@ -87,11 +87,10 @@ export function ZeiteintraegeTabelle({
 
   if (eintraege.length === 0) {
     return (
-      <Card>
-        <CardContent className="py-12 text-center">
-          <p className="text-muted-foreground">
-            Noch keine Eintraege vorhanden. Erfasse deinen ersten Arbeitstag
-            oben.
+      <Card className="shadow-sm">
+        <CardContent className="py-16 text-center">
+          <p className="text-sm text-muted-foreground">
+            Noch keine Einträge vorhanden. Erfasse deinen ersten Arbeitstag oben.
           </p>
         </CardContent>
       </Card>
@@ -101,10 +100,10 @@ export function ZeiteintraegeTabelle({
   return (
     <>
       {/* Desktop-Tabelle */}
-      <div className="hidden sm:block rounded-md border">
+      <div className="hidden sm:block rounded-lg border shadow-sm overflow-hidden">
         <Table>
           <TableHeader>
-            <TableRow>
+            <TableRow className="bg-muted/40 hover:bg-muted/40">
               <TableHead>Datum</TableHead>
               <TableHead>Von</TableHead>
               <TableHead>Bis</TableHead>
@@ -189,7 +188,7 @@ export function ZeiteintraegeTabelle({
       {/* Mobile Karten-Ansicht */}
       <div className="sm:hidden space-y-3">
         {eintraege.map((eintrag) => (
-          <Card key={eintrag.id} className="relative">
+          <Card key={eintrag.id} className="shadow-sm">
             <CardHeader className="pb-2 pt-4 px-4">
               <div className="flex items-center justify-between">
                 <div>

@@ -91,8 +91,6 @@ export default function DashboardClient() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-
       {errorKpis && (
         <Alert variant="destructive">
           <AlertDescription>{errorKpis}</AlertDescription>
@@ -170,10 +168,17 @@ export default function DashboardClient() {
 
       {/* Absenzen Bereich */}
       <section aria-label="Absenzen">
-        <AbsenzenForm onSuccess={handleAbsenzSuccess} />
+        <div className="mb-4">
+          <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
+            Absenzen erfassen
+          </h2>
+          <AbsenzenForm onSuccess={handleAbsenzSuccess} />
+        </div>
 
         <div className="mt-6">
-          <h2 className="text-lg font-semibold mb-3">Absenzen</h2>
+          <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
+            Absenzen
+          </h2>
           <AbsenzenTabelle
             absenzen={absenzen}
             onDelete={handleDeleteAbsenz}

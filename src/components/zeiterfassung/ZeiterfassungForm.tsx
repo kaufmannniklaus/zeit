@@ -118,21 +118,21 @@ export function ZeiterfassungForm({
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>
+    <Card className="shadow-sm">
+      <CardHeader className="pb-4">
+        <CardTitle className="text-base font-semibold">
           {isEditing ? "Eintrag bearbeiten" : "Neuer Zeiteintrag"}
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5">
           {error && (
             <Alert variant="destructive">
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="space-y-2">
               <Label htmlFor="datum">Datum</Label>
               <Input
@@ -167,7 +167,7 @@ export function ZeiterfassungForm({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="pauseDauer">Pause in Minuten</Label>
+              <Label htmlFor="pauseDauer">Pause (min)</Label>
               <Input
                 id="pauseDauer"
                 type="number"
@@ -200,13 +200,16 @@ export function ZeiterfassungForm({
             </Alert>
           )}
 
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">
-              Effektive Zeit:{" "}
-              <span className="font-semibold">
-                {zeitFehler ? "--" : formatiereDauer(effektivzeit)}
+          <div className="flex items-center justify-between gap-4 pt-1">
+            {/* Effektive Zeit als prominente Anzeige */}
+            <div className="flex items-center gap-3 px-4 py-2.5 rounded-lg bg-muted/60 flex-1 max-w-xs">
+              <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
+                Effektiv
               </span>
-            </p>
+              <span className="font-bold text-foreground tabular-nums ml-auto">
+                {zeitFehler ? "–" : formatiereDauer(effektivzeit)}
+              </span>
+            </div>
 
             <div className="flex gap-2">
               {isEditing && (
