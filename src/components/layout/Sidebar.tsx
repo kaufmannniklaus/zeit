@@ -27,11 +27,11 @@ export function Sidebar() {
     <>
       {/* Desktop Sidebar */}
       <aside
-        className="hidden md:flex flex-col w-56 min-h-screen bg-card border-r"
+        className="hidden md:flex flex-col w-56 min-h-screen bg-sidebar border-r border-sidebar-border"
         aria-label="Hauptnavigation"
       >
-        <div className="px-6 py-5 border-b">
-          <span className="text-xl font-bold tracking-tight">Zeit</span>
+        <div className="px-6 py-5 border-b border-sidebar-border">
+          <span className="text-xl font-bold tracking-tight text-sidebar-foreground">Zeit</span>
         </div>
         <nav className="flex-1 p-3 space-y-1" aria-label="Seiten">
           {navItems.map(({ href, label, icon: Icon }) => (
@@ -41,8 +41,8 @@ export function Sidebar() {
               className={cn(
                 "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
                 pathname.startsWith(href)
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                  ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                  : "text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
               )}
               aria-current={pathname.startsWith(href) ? "page" : undefined}
             >
@@ -51,10 +51,10 @@ export function Sidebar() {
             </Link>
           ))}
         </nav>
-        <div className="p-3 border-t">
+        <div className="p-3 border-t border-sidebar-border">
           <button
             onClick={handleLogout}
-            className="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive w-full transition-colors"
+            className="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-sidebar-foreground/50 hover:bg-destructive/20 hover:text-destructive w-full transition-colors"
             aria-label="Abmelden"
           >
             <LogOut className="h-4 w-4 shrink-0" aria-hidden="true" />
@@ -65,7 +65,7 @@ export function Sidebar() {
 
       {/* Mobile Bottom Navigation */}
       <nav
-        className="md:hidden fixed bottom-0 left-0 right-0 bg-card border-t z-50 flex justify-around py-2"
+        className="md:hidden fixed bottom-0 left-0 right-0 bg-sidebar border-t border-sidebar-border z-50 flex justify-around py-2"
         aria-label="Mobile Navigation"
       >
         {navItems.map(({ href, label, icon: Icon }) => (
@@ -75,8 +75,8 @@ export function Sidebar() {
             className={cn(
               "flex flex-col items-center gap-1 px-2 py-1 rounded-md text-xs transition-colors",
               pathname.startsWith(href)
-                ? "text-primary font-medium"
-                : "text-muted-foreground"
+                ? "text-sidebar-primary font-medium"
+                : "text-sidebar-foreground/50"
             )}
             aria-current={pathname.startsWith(href) ? "page" : undefined}
           >
@@ -86,7 +86,7 @@ export function Sidebar() {
         ))}
         <button
           onClick={handleLogout}
-          className="flex flex-col items-center gap-1 px-2 py-1 rounded-md text-xs text-muted-foreground transition-colors"
+          className="flex flex-col items-center gap-1 px-2 py-1 rounded-md text-xs text-sidebar-foreground/50 transition-colors"
           aria-label="Abmelden"
         >
           <LogOut className="h-5 w-5" />
