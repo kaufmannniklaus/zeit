@@ -47,3 +47,28 @@ model Einstellung {
   ueberstundenSaldoMinuten Int      @default(0)
   aktualisiertAm           DateTime @updatedAt
 }
+
+model TagessitzungDraft {
+  id             String    @id @default(cuid())
+  datum          DateTime  @unique @db.Date
+  startzeit      String
+  endzeit        String?
+  pausen         Json      @default("[]")
+  abgeschlossen  Boolean   @default(false)
+  gesendeteNot   Json      @default("[]")
+  naechsteNotAt  DateTime?
+  naechsteNotTyp String?
+  erstelltAm     DateTime  @default(now())
+  aktualisiertAm DateTime  @updatedAt
+
+  @@index([datum])
+  @@index([naechsteNotAt])
+}
+
+model PushSubscription {
+  id         String   @id @default(cuid())
+  endpoint   String   @unique
+  p256dh     String
+  auth       String
+  erstelltAm DateTime @default(now())
+}

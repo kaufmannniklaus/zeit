@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import "./globals.css";
 import { Sidebar } from "@/components/layout/Sidebar";
+import { ServiceWorkerRegistration } from "@/components/layout/ServiceWorkerRegistration";
 
 const geist = Geist({
   variable: "--font-geist-sans",
@@ -30,6 +31,7 @@ export default function RootLayout({
   return (
     <html lang="de">
       <body className={`${geist.variable} antialiased`}>
+        <ServiceWorkerRegistration />
         <div className="flex min-h-screen">
           <Sidebar />
           <main className="flex-1 overflow-auto pb-20 md:pb-0">

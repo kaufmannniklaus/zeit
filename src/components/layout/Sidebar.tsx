@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Clock, ScanSearch, LayoutDashboard, Settings, LogOut } from "lucide-react";
+import { Clock, ScanSearch, LayoutDashboard, Settings, LogOut, Timer } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
+  { href: "/tages-tracker", label: "Tages-Tracker", icon: Timer },
   { href: "/zeiterfassung", label: "Zeiterfassung", icon: Clock },
   { href: "/scan", label: "Scan-Abgleich", icon: ScanSearch },
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
