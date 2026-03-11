@@ -25,8 +25,8 @@ export async function POST() {
       return NextResponse.json({ sent: false, reason: "Keine Subscription." });
     }
 
-    const pausen = draft.pausen as Pause[];
-    const gesendeteNot = draft.gesendeteNot as string[];
+    const pausen = draft.pausen as unknown as Pause[];
+    const gesendeteNot = draft.gesendeteNot as unknown as string[];
     const notTyp = draft.naechsteNotTyp!;
 
     // Suche die passende Notification-Definition

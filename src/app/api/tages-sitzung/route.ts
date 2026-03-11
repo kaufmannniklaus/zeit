@@ -25,9 +25,9 @@ function serializeDraft(r: {
     datum: r.datum.toISOString().split("T")[0],
     startzeit: r.startzeit,
     endzeit: r.endzeit,
-    pausen: r.pausen as Pause[],
+    pausen: r.pausen as unknown as Pause[],
     abgeschlossen: r.abgeschlossen,
-    gesendeteNot: r.gesendeteNot as string[],
+    gesendeteNot: r.gesendeteNot as unknown as string[],
     naechsteNotAt: r.naechsteNotAt?.toISOString() ?? null,
     naechsteNotTyp: r.naechsteNotTyp,
   };
@@ -113,8 +113,8 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "Keine aktive Sitzung heute." }, { status: 404 });
     }
 
-    const pausen = current.pausen as Pause[];
-    const gesendeteNot = current.gesendeteNot as string[];
+    const pausen = current.pausen as unknown as Pause[];
+    const gesendeteNot = current.gesendeteNot as unknown as string[];
 
     let updateData: Record<string, unknown> = {};
 
