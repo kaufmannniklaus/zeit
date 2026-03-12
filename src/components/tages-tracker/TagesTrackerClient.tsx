@@ -44,9 +44,9 @@ export function TagesTrackerClient() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  // Formular-States
-  const [startInput, setStartInput] = useState(jetzt());
-  const [endzeitInput, setEndzeitInput] = useState(jetzt());
+  // Formular-States (leer initialisiert um Hydration-Mismatch zu vermeiden)
+  const [startInput, setStartInput] = useState("");
+  const [endzeitInput, setEndzeitInput] = useState("");
   const [pauseInput, setPauseInput] = useState("");
 
   // Live-Timer
@@ -61,6 +61,12 @@ export function TagesTrackerClient() {
 
   const pushCheckRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Uhrzeit-Inputs nach Hydration setzen
+  useEffect(() => {
+    setStartInput(jetzt());
+    setEndzeitInput(jetzt());
+  }, []);
+
   // Session laden
   useEffect(() => {
     fetch("/api/tages-sitzung")
@@ -71,6 +77,7 @@ export function TagesTrackerClient() {
           setPhase(data.abgeschlossen ? "ABGESCHLOSSEN" : "LAEUFT");
         }
       })
+      .catch(() => null)
       .finally(() => setLoading(false));
   }, []);
 
@@ -146,7 +153,7 @@ export function TagesTrackerClient() {
   }
 
   async function feierabendBestaetigen() {
-    setEndzeitInput(jetzt());
+    setEndzeitInput(jetzt()); // hier OK — läuft nur client-side
     setPhase("FEIERABEND");
     setArvWarnung(null);
   }
