@@ -6,7 +6,11 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Öffentliche Pfade – kein Login nötig
-  if (pathname.startsWith("/login") || pathname.startsWith("/api/auth")) {
+  if (
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/api/auth") ||
+    pathname === "/api/push/check"
+  ) {
     return NextResponse.next();
   }
 
