@@ -2,12 +2,15 @@ services:
   app:
     build: .
     ports:
-      - "3000:3000"
+      - "3001:3000"
     env_file:
       - .env.local
     environment:
       TZ: Europe/Zurich
     restart: unless-stopped
+    networks:
+      - default
+      - npm-n8n_default
 
   cron:
     image: curlimages/curl:latest
@@ -16,3 +19,9 @@ services:
     restart: unless-stopped
     entrypoint: sh
     command: -c "while true; do curl -s -X POST http://app:3000/api/push/check > /dev/null 2>&1; sleep 60; done"
+    networks:
+      - default
+
+networks:
+  npm-n8n_default:
+    external: true
