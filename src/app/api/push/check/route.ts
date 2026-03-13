@@ -38,11 +38,21 @@ export async function POST() {
     };
 
     const notif = notifMap[notTyp];
-    if (notif) {
-      await sendePushNotification(subscription, { ...notif, tag: notTyp });
+    const success = notif
+      ? await sendePushNotification(subscription, { ...notif, tag: notTyp })
+      : false;
+
+    if (!success) {
+      // Push fehlgeschlagen → in 2 Minuten erneut versuchen
+      const retryAt = new Date(jetzt.getTime() + 2 * 60 * 1000);
+      await prisma.tagessitzungDraft.update({
+        where: { id: draft.id },
+        data: { naechsteNotAt: retryAt },
+      });
+      return NextResponse.json({ sent: false, reason: "Push fehlgeschlagen, Retry in 2 min." });
     }
 
-    // Als gesendet markieren und nächste berechnen
+    // Erfolgreich gesendet → als gesendet markieren und nächste berechnen
     const neueGesendete = [...gesendeteNot, notTyp];
     const naechste = naechsteArvNotification(draft.startzeit, pausen, neueGesendete);
 

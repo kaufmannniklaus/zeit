@@ -5,4 +5,14 @@ services:
       - "3000:3000"
     env_file:
       - .env.local
+    environment:
+      TZ: Europe/Zurich
     restart: unless-stopped
+
+  cron:
+    image: curlimages/curl:latest
+    depends_on:
+      - app
+    restart: unless-stopped
+    entrypoint: sh
+    command: -c "while true; do curl -s -X POST http://app:3000/api/push/check > /dev/null 2>&1; sleep 60; done"
