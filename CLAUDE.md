@@ -61,3 +61,7 @@ VAPID_PRIVATE_KEY=<key>
 ```
 
 Generate bcrypt hash: `node -e "require('bcryptjs').hash('PASS',10).then(console.log)"`
+
+> **Docker `env_file` quirk**: `$`-signs in the bcrypt hash must be escaped as `$$`.
+> Example: `$2b$10$abc...` → `$$2b$$10$$abc...` in `.env.local`.
+> Docker interpolates unescaped `$` as shell variables, truncating the hash.
