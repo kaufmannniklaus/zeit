@@ -10,8 +10,9 @@ export function zeitStringZuMinuten(zeit: string): number {
  * Konvertiert Minuten seit Mitternacht in "HH:MM"-String.
  */
 export function minutenZuZeitString(minuten: number): string {
-  const h = Math.floor(minuten / 60);
-  const m = minuten % 60;
+  const wrapped = minuten % 1440;
+  const h = Math.floor(wrapped / 60);
+  const m = wrapped % 60;
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 

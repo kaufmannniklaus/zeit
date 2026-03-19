@@ -379,7 +379,7 @@ export function TagesTrackerClient() {
                     Späteste Pausenzeiten
                   </p>
                   {pausenDeadlines.ersteDeadline && pausenDeadlines.zweiteDeadline ? (
-                    <div className="flex gap-6">
+                    <div className="flex justify-around">
                       <div className="flex flex-col items-center">
                         <span className="text-xs text-muted-foreground">1. Pause</span>
                         <span className="font-semibold tabular-nums text-base">{pausenDeadlines.ersteDeadline}</span>
