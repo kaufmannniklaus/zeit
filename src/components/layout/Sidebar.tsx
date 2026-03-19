@@ -16,7 +16,6 @@ const navItems = [
 export function Sidebar() {
   const pathname = usePathname();
 
-  // Auf der Login-Seite keine Sidebar anzeigen
   if (pathname === "/login") return null;
 
   async function handleLogout() {
@@ -26,71 +25,104 @@ export function Sidebar() {
 
   return (
     <>
-      {/* Desktop Sidebar */}
+      {/* ── Desktop Sidebar ── */}
       <aside
-        className="hidden md:flex flex-col w-56 min-h-screen bg-sidebar border-r border-sidebar-border"
+        className="hidden md:flex flex-col w-52 min-h-screen border-r border-sidebar-border relative overflow-hidden"
+        style={{
+          background: `radial-gradient(ellipse 200% 18% at 50% 0%, oklch(0.78 0.155 72 / 8%) 0%, transparent 65%), var(--color-sidebar)`,
+        }}
         aria-label="Hauptnavigation"
       >
-        <div className="px-6 py-5 border-b border-sidebar-border">
-          <span className="text-xl font-bold tracking-tight text-sidebar-foreground">Zeit</span>
+        {/* Logo */}
+        <div className="px-5 pt-7 pb-5">
+          <span
+            className="block text-[2rem] leading-none text-sidebar-foreground tracking-tight select-none"
+            style={{ fontFamily: "var(--font-display)", fontStyle: "italic" }}
+          >
+            Zeit
+          </span>
+          <div className="mt-3 flex items-center gap-1.5">
+            <div className="h-px flex-1 bg-gradient-to-r from-sidebar-primary/50 to-transparent" />
+            <div className="w-1 h-1 rounded-full bg-sidebar-primary/70 shrink-0" />
+          </div>
         </div>
-        <nav className="flex-1 p-3 space-y-1" aria-label="Seiten">
-          {navItems.map(({ href, label, icon: Icon }) => (
-            <Link
-              key={href}
-              href={href}
-              className={cn(
-                "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
-                pathname.startsWith(href)
-                  ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                  : "text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-              )}
-              aria-current={pathname.startsWith(href) ? "page" : undefined}
-            >
-              <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-              {label}
-            </Link>
-          ))}
+
+        {/* Nav */}
+        <nav className="flex-1 px-2.5 py-1 space-y-0.5" aria-label="Seiten">
+          {navItems.map(({ href, label, icon: Icon }) => {
+            const isActive = pathname.startsWith(href);
+            return (
+              <Link
+                key={href}
+                href={href}
+                className={cn(
+                  "relative flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-all duration-150",
+                  isActive
+                    ? "bg-sidebar-accent text-sidebar-primary font-medium"
+                    : "text-sidebar-foreground/45 hover:text-sidebar-foreground/75 hover:bg-white/[0.04]"
+                )}
+                aria-current={isActive ? "page" : undefined}
+              >
+                {isActive && (
+                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-sidebar-primary rounded-full" />
+                )}
+                <Icon
+                  className={cn("h-[15px] w-[15px] shrink-0", isActive && "opacity-90")}
+                  aria-hidden="true"
+                />
+                {label}
+              </Link>
+            );
+          })}
         </nav>
-        <div className="p-3 border-t border-sidebar-border">
+
+        {/* Logout */}
+        <div className="px-2.5 py-3 border-t border-sidebar-border">
           <button
             onClick={handleLogout}
-            className="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-sidebar-foreground/50 hover:bg-destructive/20 hover:text-destructive w-full transition-colors"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm text-sidebar-foreground/30 hover:text-destructive hover:bg-destructive/10 w-full transition-all duration-150"
             aria-label="Abmelden"
           >
-            <LogOut className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <LogOut className="h-[15px] w-[15px] shrink-0" aria-hidden="true" />
             Abmelden
           </button>
         </div>
       </aside>
 
-      {/* Mobile Bottom Navigation */}
+      {/* ── Mobile Bottom Navigation ── */}
       <nav
-        className="md:hidden fixed bottom-0 left-0 right-0 bg-sidebar border-t border-sidebar-border z-50 flex justify-around py-2"
+        className="md:hidden fixed bottom-0 left-0 right-0 border-t border-sidebar-border z-50 flex justify-around items-stretch"
+        style={{ background: `var(--color-sidebar)` }}
         aria-label="Mobile Navigation"
       >
-        {navItems.map(({ href, label, icon: Icon }) => (
-          <Link
-            key={href}
-            href={href}
-            className={cn(
-              "flex flex-col items-center gap-1 px-2 py-1 rounded-md text-xs transition-colors",
-              pathname.startsWith(href)
-                ? "text-sidebar-primary font-medium"
-                : "text-sidebar-foreground/50"
-            )}
-            aria-current={pathname.startsWith(href) ? "page" : undefined}
-          >
-            <Icon className="h-5 w-5" />
-            <span>{label.split("-")[0]}</span>
-          </Link>
-        ))}
+        {navItems.map(({ href, label, icon: Icon }) => {
+          const isActive = pathname.startsWith(href);
+          return (
+            <Link
+              key={href}
+              href={href}
+              className={cn(
+                "relative flex flex-col items-center gap-1 px-2 py-2.5 text-[10px] transition-all duration-150 min-w-0",
+                isActive
+                  ? "text-sidebar-primary font-medium"
+                  : "text-sidebar-foreground/40"
+              )}
+              aria-current={isActive ? "page" : undefined}
+            >
+              {isActive && (
+                <span className="absolute top-0 left-1/2 -translate-x-1/2 w-5 h-[2px] bg-sidebar-primary rounded-full" />
+              )}
+              <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
+              <span className="truncate">{label.split("-")[0]}</span>
+            </Link>
+          );
+        })}
         <button
           onClick={handleLogout}
-          className="flex flex-col items-center gap-1 px-2 py-1 rounded-md text-xs text-sidebar-foreground/50 transition-colors"
+          className="flex flex-col items-center gap-1 px-2 py-2.5 text-[10px] text-sidebar-foreground/30 transition-all duration-150 hover:text-destructive"
           aria-label="Abmelden"
         >
-          <LogOut className="h-5 w-5" />
+          <LogOut className="h-5 w-5 shrink-0" aria-hidden="true" />
           <span>Logout</span>
         </button>
       </nav>

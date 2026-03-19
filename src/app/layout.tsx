@@ -1,12 +1,24 @@
 import type { Metadata } from "next";
-import { Geist } from "next/font/google";
+import { Instrument_Serif, DM_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { ServiceWorkerRegistration } from "@/components/layout/ServiceWorkerRegistration";
 
-const geist = Geist({
-  variable: "--font-geist-sans",
+const instrumentSerif = Instrument_Serif({
+  weight: ["400"],
+  style: ["normal", "italic"],
   subsets: ["latin"],
+  variable: "--font-display",
+});
+
+const dmSans = DM_Sans({
+  subsets: ["latin"],
+  variable: "--font-sans",
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-mono",
 });
 
 export const metadata: Metadata = {
@@ -30,7 +42,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="de">
-      <body className={`${geist.variable} antialiased`}>
+      <body
+        className={`${instrumentSerif.variable} ${dmSans.variable} ${jetbrainsMono.variable} antialiased`}
+      >
         <ServiceWorkerRegistration />
         <div className="flex min-h-screen">
           <Sidebar />
