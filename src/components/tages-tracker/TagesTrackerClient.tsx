@@ -379,26 +379,22 @@ export function TagesTrackerClient() {
                     Späteste Pausenzeiten
                   </p>
                   {pausenDeadlines.ersteDeadline && pausenDeadlines.zweiteDeadline ? (
-                    <div className="flex gap-4">
-                      <div className="flex items-center gap-1.5">
-                        <Clock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                        <span className="text-muted-foreground">1. Pause bis</span>
-                        <span className="font-semibold tabular-nums">{pausenDeadlines.ersteDeadline}</span>
+                    <div className="flex gap-6">
+                      <div className="flex flex-col items-center">
+                        <span className="text-xs text-muted-foreground">1. Pause</span>
+                        <span className="font-semibold tabular-nums text-base">{pausenDeadlines.ersteDeadline}</span>
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        <Clock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                        <span className="text-muted-foreground">2. Pause bis</span>
-                        <span className="font-semibold tabular-nums">{pausenDeadlines.zweiteDeadline}</span>
+                      <div className="flex flex-col items-center">
+                        <span className="text-xs text-muted-foreground">2. Pause</span>
+                        <span className="font-semibold tabular-nums text-base">{pausenDeadlines.zweiteDeadline}</span>
                       </div>
                     </div>
                   ) : pausenDeadlines.naechsteDeadline ? (
-                    <div className="flex items-center gap-1.5">
-                      <Clock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                      <span className="text-muted-foreground">Nächste Pause bis</span>
-                      <span className="font-semibold tabular-nums">{pausenDeadlines.naechsteDeadline}</span>
+                    <div className="flex flex-col items-center w-fit">
                       <span className="text-xs text-muted-foreground">
-                        ({pausenDeadlines.naechsteTyp === "sechs_stunden" ? "6h-Regel" : "9h-Regel"})
+                        Nächste Pause ({pausenDeadlines.naechsteTyp === "sechs_stunden" ? "6h-Regel" : "9h-Regel"})
                       </span>
+                      <span className="font-semibold tabular-nums text-base">{pausenDeadlines.naechsteDeadline}</span>
                     </div>
                   ) : null}
                 </div>
