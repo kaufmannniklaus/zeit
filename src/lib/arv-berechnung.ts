@@ -165,4 +165,72 @@ export function arvStatus(
   return { farbe: "gruen", text: "ARV OK" };
 }
 
+export interface PausenDeadlines {
+  // Wenn keine Pause: beide Deadlines anzeigen
+  ersteDeadline: string | null;    // "HH:MM" – späteste 1. Pause (6h-Regel)
+  zweiteDeadline: string | null;   // "HH:MM" – späteste 2. Pause (9h-Regel)
+  // Wenn Pause(n) vorhanden: nächste Deadline
+  naechsteDeadline: string | null; // "HH:MM"
+  naechsteTyp: "sechs_stunden" | "neun_stunden" | null;
+}
+
+/**
+ * Berechnet die spätesten Pausenzeiten basierend auf:
+ * - 6h-Regel: max. 6h am Stück ohne Pause (Art. 15 ArG)
+ * - 9h-Netto-Regel: bei 9h Netto muss mind. 30min Pause total gemacht worden sein
+ *
+ * Wenn keine Pause: zeigt 1. Deadline (start+6h) und 2. Deadline (start+9h15min)
+ * Nach einer Pause: zeigt min(letzte_pause_ende+6h, start+9h15min)
+ */
+export function berechnePausenDeadlines(
+  startzeit: string,
+  pausen: Pause[]
+): PausenDeadlines {
+  const startMin = zeitStringZuMinuten(startzeit);
+  const gesamtPausen = gesamtPausenMinuten(pausen);
+
+  // 9h-Netto-Deadline: start + 9h + 15min (Mindestpause) = absoluter spätester Zeitpunkt
+  const neunStundenDeadlineMin = startMin + ARV.LIMIT_9H + ARV.PFLICHT_BIS_6H;
+
+  if (pausen.length === 0) {
+    return {
+      ersteDeadline: minutenZuZeitString(startMin + ARV.LIMIT_6H),
+      zweiteDeadline: minutenZuZeitString(neunStundenDeadlineMin),
+      naechsteDeadline: null,
+      naechsteTyp: null,
+    };
+  }
+
+  // Letzte Pause: erstelltAm = wann Pause erfasst wurde (≈ Ende der Pause)
+  const letztePause = pausen[pausen.length - 1];
+  const letztePauseEnde = new Date(letztePause.erstelltAm);
+  const letztePauseEndMin =
+    letztePauseEnde.getHours() * 60 + letztePauseEnde.getMinutes();
+
+  const sechsStundenDeadlineMin = letztePauseEndMin + ARV.LIMIT_6H;
+
+  // 9h-Regel bereits erfüllt (≥30min Pause): nur noch 6h-Regel relevant
+  if (gesamtPausen >= ARV.PFLICHT_BIS_9H) {
+    return {
+      ersteDeadline: null,
+      zweiteDeadline: null,
+      naechsteDeadline: minutenZuZeitString(sechsStundenDeadlineMin),
+      naechsteTyp: "sechs_stunden",
+    };
+  }
+
+  const naechsteMin = Math.min(sechsStundenDeadlineMin, neunStundenDeadlineMin);
+  const naechsteTyp =
+    sechsStundenDeadlineMin <= neunStundenDeadlineMin
+      ? "sechs_stunden"
+      : "neun_stunden";
+
+  return {
+    ersteDeadline: null,
+    zweiteDeadline: null,
+    naechsteDeadline: minutenZuZeitString(naechsteMin),
+    naechsteTyp,
+  };
+}
+
 export { minutenZuZeitString };

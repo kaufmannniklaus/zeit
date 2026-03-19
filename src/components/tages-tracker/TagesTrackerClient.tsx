@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   arvStatus,
   berechneNettoMinuten,
+  berechnePausenDeadlines,
   gesamtPausenMinuten,
   pruefeFeierabendArv,
   type Pause,
@@ -116,6 +117,7 @@ export function TagesTrackerClient() {
     : 0;
   const gesamtPausen = session ? gesamtPausenMinuten(session.pausen) : 0;
   const status = arvStatus(nettoMin, gesamtPausen);
+  const pausenDeadlines = session ? berechnePausenDeadlines(session.startzeit, session.pausen) : null;
   void tick; // Trigger re-render
 
   // --- Aktionen ---
@@ -369,6 +371,38 @@ export function TagesTrackerClient() {
                 )}
                 {status.text}
               </div>
+
+              {/* Späteste Pausenzeiten */}
+              {pausenDeadlines && (
+                <div className="mt-3 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm">
+                  <p className="text-xs font-medium text-muted-foreground mb-1.5">
+                    Späteste Pausenzeiten
+                  </p>
+                  {pausenDeadlines.ersteDeadline && pausenDeadlines.zweiteDeadline ? (
+                    <div className="flex gap-4">
+                      <div className="flex items-center gap-1.5">
+                        <Clock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                        <span className="text-muted-foreground">1. Pause bis</span>
+                        <span className="font-semibold tabular-nums">{pausenDeadlines.ersteDeadline}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Clock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                        <span className="text-muted-foreground">2. Pause bis</span>
+                        <span className="font-semibold tabular-nums">{pausenDeadlines.zweiteDeadline}</span>
+                      </div>
+                    </div>
+                  ) : pausenDeadlines.naechsteDeadline ? (
+                    <div className="flex items-center gap-1.5">
+                      <Clock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                      <span className="text-muted-foreground">Nächste Pause bis</span>
+                      <span className="font-semibold tabular-nums">{pausenDeadlines.naechsteDeadline}</span>
+                      <span className="text-xs text-muted-foreground">
+                        ({pausenDeadlines.naechsteTyp === "sechs_stunden" ? "6h-Regel" : "9h-Regel"})
+                      </span>
+                    </div>
+                  ) : null}
+                </div>
+              )}
             </CardContent>
           </Card>
 
