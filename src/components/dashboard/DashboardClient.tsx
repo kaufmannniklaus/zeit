@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import type { Absenz, KpiDaten } from "@/types";
 import KpiKarte from "@/components/dashboard/KpiKarte";
 import AbsenzenForm from "@/components/dashboard/AbsenzenForm";
@@ -14,12 +16,22 @@ function formatMinuten(minuten: number): string {
   return `${sign}${h}h ${m.toString().padStart(2, "0")}min`;
 }
 
+interface PausenEintrag {
+  id: string;
+  datum: string;
+  erfassteMinuten: number;
+  effektiveMinuten: number;
+  zeitNachgeholt: boolean | null;
+}
+
 export default function DashboardClient() {
   const [kpis, setKpis] = useState<KpiDaten | null>(null);
   const [absenzen, setAbsenzen] = useState<Absenz[]>([]);
   const [loadingKpis, setLoadingKpis] = useState(true);
   const [loadingAbsenzen, setLoadingAbsenzen] = useState(true);
   const [errorKpis, setErrorKpis] = useState<string | null>(null);
+  const [pausenEintraege, setPausenEintraege] = useState<PausenEintrag[]>([]);
+  const [pausenBilanz, setPausenBilanz] = useState<number>(0);
 
   const loadKpis = useCallback(async () => {
     setLoadingKpis(true);
@@ -54,6 +66,13 @@ export default function DashboardClient() {
   useEffect(() => {
     loadKpis();
     loadAbsenzen();
+    fetch("/api/pausen-protokoll")
+      .then((r) => r.json())
+      .then(({ eintraege, bilanzMinuten }) => {
+        setPausenEintraege(eintraege ?? []);
+        setPausenBilanz(bilanzMinuten ?? 0);
+      })
+      .catch(() => null);
   }, [loadKpis, loadAbsenzen]);
 
   async function handleDeleteAbsenz(id: string) {
@@ -165,6 +184,61 @@ export default function DashboardClient() {
           }
         />
       </div>
+
+      {/* Pausen-Bilanz */}
+      {pausenEintraege.length > 0 && (
+        <section aria-label="Pausen-Bilanz">
+          <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
+            Pausen-Bilanz
+          </h2>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm flex items-center justify-between">
+                <span>Gesamt-Bilanz</span>
+                <Badge
+                  variant={pausenBilanz < 0 ? "default" : pausenBilanz > 0 ? "destructive" : "secondary"}
+                >
+                  {pausenBilanz < 0
+                    ? `${Math.abs(pausenBilanz)} min geschenkt`
+                    : pausenBilanz > 0
+                      ? `${pausenBilanz} min genommen`
+                      : "Ausgeglichen"}
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-1">
+                {pausenEintraege.slice(0, 10).map((e) => {
+                  const diff = e.effektiveMinuten - e.erfassteMinuten;
+                  const datum = new Date(e.datum).toLocaleDateString("de-CH", {
+                    day: "2-digit", month: "2-digit", year: "2-digit",
+                  });
+                  return (
+                    <div key={e.id} className="flex items-center justify-between text-sm py-1 border-b last:border-0">
+                      <span className="text-muted-foreground font-time">{datum}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground text-xs">
+                          {e.erfassteMinuten}→{e.effektiveMinuten} min
+                        </span>
+                        {diff === 0 ? (
+                          <Badge variant="secondary" className="text-xs">±0</Badge>
+                        ) : diff < 0 ? (
+                          <Badge variant="default" className="text-xs">{diff} min geschenkt</Badge>
+                        ) : (
+                          <Badge variant="destructive" className="text-xs">+{diff} min genommen</Badge>
+                        )}
+                        {e.zeitNachgeholt === true && (
+                          <span className="text-xs text-muted-foreground">(nachgeholt)</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        </section>
+      )}
 
       {/* Absenzen Bereich */}
       <section aria-label="Absenzen">

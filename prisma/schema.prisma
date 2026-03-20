@@ -65,6 +65,17 @@ model TagessitzungDraft {
   @@index([naechsteNotAt])
 }
 
+model PausenProtokoll {
+  id                String   @id @default(cuid())
+  datum             DateTime @db.Date
+  erfassteMinuten   Int
+  effektiveMinuten  Int
+  zeitNachgeholt    Boolean?
+  erstelltAm        DateTime @default(now())
+
+  @@index([datum])
+}
+
 model PushSubscription {
   id         String   @id @default(cuid())
   endpoint   String   @unique

@@ -27,7 +27,9 @@ interface Session {
   naechsteNotAt: string | null;
 }
 
-type Phase = "KEIN_TAG" | "LAEUFT" | "FEIERABEND" | "ABGESCHLOSSEN";
+type Phase = "KEIN_TAG" | "LAEUFT" | "FEIERABEND" | "PAUSEN_CHECK" | "ABGESCHLOSSEN";
+
+type PausenCheckSchritt = "FRAGE_GEMACHT" | "FRAGE_NACHGEHOLT";
 
 function jetzt(): string {
   const now = new Date();
@@ -59,6 +61,10 @@ export function TagesTrackerClient() {
 
   // ARV Feierabend-Warnung
   const [arvWarnung, setArvWarnung] = useState<string | null>(null);
+
+  // Pausen-Ehrlichkeits-Check
+  const [pausenCheckSchritt, setPausenCheckSchritt] = useState<PausenCheckSchritt>("FRAGE_GEMACHT");
+  const [effektivePauseInput, setEffektivePauseInput] = useState("");
 
   const pushCheckRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -155,9 +161,29 @@ export function TagesTrackerClient() {
   }
 
   async function feierabendBestaetigen() {
-    setEndzeitInput(jetzt()); // hier OK — läuft nur client-side
-    setPhase("FEIERABEND");
+    setEndzeitInput(jetzt());
+    setPausenCheckSchritt("FRAGE_GEMACHT");
+    setEffektivePauseInput(String(gesamtPausen));
+    setPhase("PAUSEN_CHECK");
+  }
+
+  async function pausenCheckWeiter(effektiv: number, nachgeholt: boolean | null) {
+    if (!session) return;
+    // Protokoll nur speichern wenn es Pausen gab
+    if (gesamtPausen > 0 || effektiv > 0) {
+      await fetch("/api/pausen-protokoll", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          datum: session.datum,
+          erfassteMinuten: gesamtPausen,
+          effektiveMinuten: effektiv,
+          zeitNachgeholt: nachgeholt,
+        }),
+      }).catch(() => null);
+    }
     setArvWarnung(null);
+    setPhase("FEIERABEND");
   }
 
   async function tagSpeichern() {
@@ -222,6 +248,8 @@ export function TagesTrackerClient() {
     setPhase("KEIN_TAG");
     setStartInput(jetzt());
     setArvWarnung(null);
+    setPausenCheckSchritt("FRAGE_GEMACHT");
+    setEffektivePauseInput("");
   }
 
   async function pushAktivieren() {
@@ -479,6 +507,82 @@ export function TagesTrackerClient() {
             </Button>
           </div>
         </>
+      )}
+
+      {/* ===== PHASE: PAUSEN_CHECK ===== */}
+      {phase === "PAUSEN_CHECK" && session && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Coffee className="h-4 w-4" />
+              Pausen-Check
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Erfasste Pausen: <span className="font-medium text-foreground">{gesamtPausen} min</span>
+            </p>
+
+            {pausenCheckSchritt === "FRAGE_GEMACHT" && (
+              <>
+                <p className="text-sm font-medium">Wurden die Pausen effektiv gemacht?</p>
+                <div className="flex gap-2">
+                  <Button
+                    className="flex-1"
+                    onClick={() => pausenCheckWeiter(gesamtPausen, null)}
+                  >
+                    Ja, alles gemacht
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => setPausenCheckSchritt("FRAGE_NACHGEHOLT")}
+                  >
+                    Nein
+                  </Button>
+                </div>
+              </>
+            )}
+
+            {pausenCheckSchritt === "FRAGE_NACHGEHOLT" && (
+              <>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Effektive Pausenzeit (min)</label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={gesamtPausen}
+                    value={effektivePauseInput}
+                    onChange={(e) => setEffektivePauseInput(e.target.value)}
+                    className="max-w-[140px]"
+                    autoFocus
+                  />
+                </div>
+                <p className="text-sm font-medium">Wurde die Differenz als Mehrarbeit nachgeholt?</p>
+                <div className="flex gap-2">
+                  <Button
+                    className="flex-1"
+                    onClick={() => pausenCheckWeiter(parseInt(effektivePauseInput) || 0, true)}
+                    disabled={effektivePauseInput === ""}
+                  >
+                    Ja, nachgeholt
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => pausenCheckWeiter(parseInt(effektivePauseInput) || 0, false)}
+                    disabled={effektivePauseInput === ""}
+                  >
+                    Nein
+                  </Button>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => setPausenCheckSchritt("FRAGE_GEMACHT")}>
+                  Zurück
+                </Button>
+              </>
+            )}
+          </CardContent>
+        </Card>
       )}
 
       {/* ===== PHASE: FEIERABEND ===== */}

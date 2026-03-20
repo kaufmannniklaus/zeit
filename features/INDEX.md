@@ -5,6 +5,8 @@
 | ZEIT-1 | Zeiterfassung (CRUD) | In Review |
 | ZEIT-2 | Scan-Abgleich (OCR) | In Review |
 | ZEIT-3 | Dashboard, Absenzen & KPIs | In Review |
+| ZEIT-4 | Tages-Tracker mit ARV-Push | Deployed |
+| ZEIT-5 | Pausen-Ehrlichkeits-Protokoll | In Progress |
 
 ## Tech Stack
 - Next.js 14 (App Router)
