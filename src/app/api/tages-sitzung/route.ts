@@ -95,6 +95,7 @@ const PutSchema = z.object({
   aktion: z.enum(["pause_hinzufuegen", "endzeit_setzen", "abschliessen"]),
   minuten: z.number().int().min(1).max(480).optional(),
   endzeit: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+  pauseEndezeit: z.string().regex(/^\d{2}:\d{2}$/).optional(),
 });
 
 // PUT – Pause hinzufügen / Endzeit setzen / Abschliessen
@@ -124,7 +125,11 @@ export async function PUT(request: NextRequest) {
       }
       const neuePausen: Pause[] = [
         ...pausen,
-        { minuten: parsed.data.minuten, erstelltAm: new Date().toISOString() },
+        {
+          minuten: parsed.data.minuten,
+          erstelltAm: new Date().toISOString(),
+          ...(parsed.data.pauseEndezeit ? { endezeit: parsed.data.pauseEndezeit } : {}),
+        },
       ];
       const naechste = naechsteArvNotification(current.startzeit, neuePausen, gesendeteNot);
       updateData = {

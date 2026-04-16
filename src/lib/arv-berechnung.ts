@@ -3,6 +3,7 @@ import { zeitStringZuMinuten, minutenZuZeitString } from "./zeit-utils";
 export interface Pause {
   minuten: number;
   erstelltAm: string;
+  endezeit?: string; // "HH:MM" – explizites Pause-Ende (überschreibt erstelltAm für Berechnungen)
 }
 
 // ARV-Regel 1 (Schweiz, Art. 15 ArG)
@@ -201,11 +202,14 @@ export function berechnePausenDeadlines(
     };
   }
 
-  // Letzte Pause: erstelltAm = wann Pause erfasst wurde (≈ Ende der Pause)
+  // Letzte Pause: endezeit hat Vorrang, sonst erstelltAm als Fallback
   const letztePause = pausen[pausen.length - 1];
-  const letztePauseEnde = new Date(letztePause.erstelltAm);
-  const letztePauseEndMin =
-    letztePauseEnde.getHours() * 60 + letztePauseEnde.getMinutes();
+  const letztePauseEndMin = letztePause.endezeit
+    ? zeitStringZuMinuten(letztePause.endezeit)
+    : (() => {
+        const d = new Date(letztePause.erstelltAm);
+        return d.getHours() * 60 + d.getMinutes();
+      })();
 
   const sechsStundenDeadlineMin = letztePauseEndMin + ARV.LIMIT_6H;
 

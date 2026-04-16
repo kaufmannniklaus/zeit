@@ -66,6 +66,10 @@ export function TagesTrackerClient() {
   const [pausenCheckSchritt, setPausenCheckSchritt] = useState<PausenCheckSchritt>("FRAGE_GEMACHT");
   const [effektivePauseInput, setEffektivePauseInput] = useState("");
 
+  // Pause-Endezeit-Dialog
+  const [pendingPauseMin, setPendingPauseMin] = useState<number | null>(null);
+  const [pauseEndeInput, setPauseEndeInput] = useState("");
+
   const pushCheckRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Uhrzeit-Inputs nach Hydration setzen
@@ -143,18 +147,31 @@ export function TagesTrackerClient() {
     }
   }
 
-  async function pauseHinzufuegen(minuten: number) {
+  function pauseAnfragen(minuten: number) {
     if (!session || minuten < 1) return;
+    setPendingPauseMin(minuten);
+    setPauseEndeInput(jetzt());
+  }
+
+  async function pauseBestaetigen() {
+    if (!session || pendingPauseMin === null) return;
     setSaving(true);
     try {
+      const body: Record<string, unknown> = {
+        aktion: "pause_hinzufuegen",
+        minuten: pendingPauseMin,
+      };
+      if (pauseEndeInput) body.pauseEndezeit = pauseEndeInput;
       const res = await fetch("/api/tages-sitzung", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ aktion: "pause_hinzufuegen", minuten }),
+        body: JSON.stringify(body),
       });
       const { data } = await res.json();
       setSession(data);
       setPauseInput("");
+      setPendingPauseMin(null);
+      setPauseEndeInput("");
     } finally {
       setSaving(false);
     }
@@ -250,6 +267,8 @@ export function TagesTrackerClient() {
     setArvWarnung(null);
     setPausenCheckSchritt("FRAGE_GEMACHT");
     setEffektivePauseInput("");
+    setPendingPauseMin(null);
+    setPauseEndeInput("");
   }
 
   async function pushAktivieren() {
@@ -439,37 +458,66 @@ export function TagesTrackerClient() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="flex gap-2">
-                {[15, 30, 45].map((min) => (
-                  <Button
-                    key={min}
-                    variant="outline"
-                    onClick={() => pauseHinzufuegen(min)}
-                    disabled={saving}
-                    className="flex-1"
-                  >
-                    +{min} min
-                  </Button>
-                ))}
-              </div>
-              <div className="flex gap-2">
-                <Input
-                  type="number"
-                  placeholder="Eigene Pausenzeit (min)"
-                  value={pauseInput}
-                  onChange={(e) => setPauseInput(e.target.value)}
-                  min={1}
-                  max={480}
-                  className="flex-1"
-                />
-                <Button
-                  variant="secondary"
-                  onClick={() => pauseHinzufuegen(parseInt(pauseInput))}
-                  disabled={saving || !pauseInput || parseInt(pauseInput) < 1}
-                >
-                  Hinzufügen
-                </Button>
-              </div>
+              {pendingPauseMin === null ? (
+                <>
+                  <div className="flex gap-2">
+                    {[15, 30, 45].map((min) => (
+                      <Button
+                        key={min}
+                        variant="outline"
+                        onClick={() => pauseAnfragen(min)}
+                        disabled={saving}
+                        className="flex-1"
+                      >
+                        +{min} min
+                      </Button>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <Input
+                      type="number"
+                      placeholder="Eigene Pausenzeit (min)"
+                      value={pauseInput}
+                      onChange={(e) => setPauseInput(e.target.value)}
+                      min={1}
+                      max={480}
+                      className="flex-1"
+                    />
+                    <Button
+                      variant="secondary"
+                      onClick={() => pauseAnfragen(parseInt(pauseInput))}
+                      disabled={saving || !pauseInput || parseInt(pauseInput) < 1}
+                    >
+                      Hinzufügen
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-sm font-medium">
+                    {pendingPauseMin} min Pause – wann war sie zu Ende?
+                  </p>
+                  <Input
+                    type="time"
+                    value={pauseEndeInput}
+                    onChange={(e) => setPauseEndeInput(e.target.value)}
+                    className="max-w-[140px] text-lg"
+                    autoFocus
+                  />
+                  <div className="flex gap-2">
+                    <Button onClick={pauseBestaetigen} disabled={saving} className="flex-1">
+                      {saving ? "Speichert…" : "Pause erfassen"}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      onClick={() => { setPendingPauseMin(null); setPauseEndeInput(""); }}
+                      disabled={saving}
+                    >
+                      Abbrechen
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
