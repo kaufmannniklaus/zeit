@@ -3,13 +3,20 @@ import { prisma } from "@/lib/prisma";
 import { sendePushNotification } from "@/lib/push-service";
 import { naechsteArvNotification, type Pause } from "@/lib/arv-berechnung";
 
+function heuteDate(): Date {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
 export async function POST() {
   try {
     const jetzt = new Date();
 
-    // Heutige Session mit fälliger Benachrichtigung suchen
+    // Nur heutige Session mit fälliger Benachrichtigung suchen
     const draft = await prisma.tagessitzungDraft.findFirst({
       where: {
+        datum: heuteDate(),
         abgeschlossen: false,
         naechsteNotAt: { lte: jetzt },
         naechsteNotTyp: { not: null },
