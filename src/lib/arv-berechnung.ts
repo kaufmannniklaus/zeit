@@ -70,6 +70,13 @@ export function gesamtPausenMinuten(pausen: Pause[]): number {
   return pausen.reduce((s, p) => s + p.minuten, 0);
 }
 
+// Nur Pausen ≥15 min zählen gemäss ARV (kürzere gelten als Arbeitszeit)
+export function gesamtArvPausenMinuten(pausen: Pause[]): number {
+  return pausen
+    .filter(p => p.minuten >= ARV.MIN_PAUSE)
+    .reduce((s, p) => s + p.minuten, 0);
+}
+
 /**
  * Netto-Arbeitsminuten = (Jetzt - Start) - Gesamtpausen
  */
@@ -103,12 +110,12 @@ export function naechsteArvNotification(
   pausen: Pause[],
   bereitsGesendet: string[]
 ): { typ: ArvNotifTyp; faelligUm: Date; titel: string; body: string } | null {
-  const gesamtPausen = gesamtPausenMinuten(pausen);
+  const arvPausen = gesamtArvPausenMinuten(pausen);
   const jetzt = new Date();
 
   for (const cp of CHECKPOINTS) {
     if (bereitsGesendet.includes(cp.typ)) continue;
-    if (gesamtPausen >= cp.pausenPflicht) continue; // Pflichtpause bereits erfüllt
+    if (arvPausen >= cp.pausenPflicht) continue; // Pflichtpause bereits erfüllt
 
     const absolutMin = checkpointZuAbsolutMin(startzeit, cp.nettoMin, pausen);
     const faelligUm = new Date();
@@ -136,7 +143,7 @@ export function pruefeFeierabendArv(
     gesamtPausenMinuten(pausen);
 
   if (nettoMin > ARV.LIMIT_9H) {
-    const fehlend = mindestPauseFehlend(Math.max(0, ARV.PFLICHT_UEBER_9H - gesamtPausenMinuten(pausen)));
+    const fehlend = mindestPauseFehlend(Math.max(0, ARV.PFLICHT_UEBER_9H - gesamtArvPausenMinuten(pausen)));
     if (fehlend > 0) return { verletzt: true, fehlendeMinuten: fehlend };
   }
   return { verletzt: false, fehlendeMinuten: 0 };
@@ -194,12 +201,15 @@ export function berechnePausenDeadlines(
   pausen: Pause[]
 ): PausenDeadlines {
   const startMin = zeitStringZuMinuten(startzeit);
-  const gesamtPausen = gesamtPausenMinuten(pausen);
+  const arvPausen = gesamtArvPausenMinuten(pausen);
 
   // 9h-Netto-Deadline: start + 9h + 15min (Mindestpause) = absoluter spätester Zeitpunkt
   const neunStundenDeadlineMin = startMin + ARV.LIMIT_9H + ARV.PFLICHT_BIS_6H;
 
-  if (pausen.length === 0) {
+  // Letzte qualifizierende Pause (≥15 min) für 6h-Uhr-Reset
+  const qualifizierendePausen = pausen.filter(p => p.minuten >= ARV.MIN_PAUSE);
+
+  if (qualifizierendePausen.length === 0) {
     return {
       ersteDeadline: minutenZuZeitString(startMin + ARV.LIMIT_6H),
       zweiteDeadline: minutenZuZeitString(neunStundenDeadlineMin),
@@ -208,8 +218,8 @@ export function berechnePausenDeadlines(
     };
   }
 
-  // Letzte Pause: endezeit hat Vorrang, sonst erstelltAm als Fallback
-  const letztePause = pausen[pausen.length - 1];
+  // Letzte qualifizierende Pause: endezeit hat Vorrang, sonst erstelltAm als Fallback
+  const letztePause = qualifizierendePausen[qualifizierendePausen.length - 1];
   const letztePauseEndMin = letztePause.endezeit
     ? zeitStringZuMinuten(letztePause.endezeit)
     : (() => {
@@ -219,8 +229,8 @@ export function berechnePausenDeadlines(
 
   const sechsStundenDeadlineMin = letztePauseEndMin + ARV.LIMIT_6H;
 
-  // 9h-Regel bereits erfüllt (≥30min Pause): nur noch 6h-Regel relevant
-  if (gesamtPausen >= ARV.PFLICHT_BIS_9H) {
+  // 9h-Regel bereits erfüllt (≥30min ARV-Pause): nur noch 6h-Regel relevant
+  if (arvPausen >= ARV.PFLICHT_BIS_9H) {
     return {
       ersteDeadline: null,
       zweiteDeadline: null,

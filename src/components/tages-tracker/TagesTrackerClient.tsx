@@ -11,6 +11,7 @@ import {
   berechneNettoMinuten,
   berechnePausenDeadlines,
   gesamtPausenMinuten,
+  gesamtArvPausenMinuten,
   pruefeFeierabendArv,
   type Pause,
 } from "@/lib/arv-berechnung";
@@ -126,7 +127,8 @@ export function TagesTrackerClient() {
     ? berechneNettoMinuten(session.startzeit, jetztMinuten(), session.pausen)
     : 0;
   const gesamtPausen = session ? gesamtPausenMinuten(session.pausen) : 0;
-  const status = arvStatus(nettoMin, gesamtPausen);
+  const arvPausen = session ? gesamtArvPausenMinuten(session.pausen) : 0;
+  const status = arvStatus(nettoMin, arvPausen);
   const pausenDeadlines = session ? berechnePausenDeadlines(session.startzeit, session.pausen) : null;
   void tick; // Trigger re-render
 
