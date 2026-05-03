@@ -8,12 +8,18 @@ export interface Pause {
 
 // ARV-Regel 1 (Schweiz, Art. 15 ArG)
 export const ARV = {
-  LIMIT_6H: 360,       // 6h in Minuten
-  LIMIT_9H: 540,       // 9h in Minuten
-  PFLICHT_BIS_6H: 15,  // mind. 15 min Pause bis 6h Arbeit
-  PFLICHT_BIS_9H: 30,  // mind. 30 min Pause bis 9h Arbeit
+  LIMIT_6H: 360,        // 6h in Minuten
+  LIMIT_9H: 540,        // 9h in Minuten
+  PFLICHT_BIS_6H: 15,   // mind. 15 min Pause bis 6h Arbeit
+  PFLICHT_BIS_9H: 30,   // mind. 30 min Pause bis 9h Arbeit
   PFLICHT_UEBER_9H: 45, // mind. 45 min Pause über 9h Arbeit
+  MIN_PAUSE: 15,        // Jede Einzelpause muss mind. 15 min lang sein (Art. 15 ArG)
 } as const;
+
+// Jede Pause muss mind. 15 min lang sein – fehlende Minuten auf 15 aufrunden
+function mindestPauseFehlend(fehlend: number): number {
+  return fehlend > 0 ? Math.max(fehlend, ARV.MIN_PAUSE) : 0;
+}
 
 export type ArvNotifTyp =
   | "ARV_6H_30MIN"
@@ -130,7 +136,7 @@ export function pruefeFeierabendArv(
     gesamtPausenMinuten(pausen);
 
   if (nettoMin > ARV.LIMIT_9H) {
-    const fehlend = Math.max(0, ARV.PFLICHT_UEBER_9H - gesamtPausenMinuten(pausen));
+    const fehlend = mindestPauseFehlend(Math.max(0, ARV.PFLICHT_UEBER_9H - gesamtPausenMinuten(pausen)));
     if (fehlend > 0) return { verletzt: true, fehlendeMinuten: fehlend };
   }
   return { verletzt: false, fehlendeMinuten: 0 };
@@ -146,17 +152,17 @@ export function arvStatus(
   if (nettoMinuten >= ARV.LIMIT_9H) {
     if (gesamtPausenMin >= ARV.PFLICHT_UEBER_9H)
       return { farbe: "gruen", text: "ARV OK – 45 min Pause ✓" };
-    const fehlend = ARV.PFLICHT_UEBER_9H - gesamtPausenMin;
+    const fehlend = mindestPauseFehlend(ARV.PFLICHT_UEBER_9H - gesamtPausenMin);
     return { farbe: "rot", text: `ARV: noch ${fehlend} min Pause nötig (45 min Pflicht >9h)` };
   }
   if (nettoMinuten >= ARV.LIMIT_6H) {
     if (gesamtPausenMin >= ARV.PFLICHT_BIS_9H)
       return { farbe: "gruen", text: "ARV OK – 30 min Pause ✓" };
     if (gesamtPausenMin >= ARV.PFLICHT_BIS_6H) {
-      const fehlend = ARV.PFLICHT_BIS_9H - gesamtPausenMin;
+      const fehlend = mindestPauseFehlend(ARV.PFLICHT_BIS_9H - gesamtPausenMin);
       return { farbe: "gelb", text: `ARV: noch ${fehlend} min für 9h-Regel` };
     }
-    const fehlend = ARV.PFLICHT_BIS_6H - gesamtPausenMin;
+    const fehlend = mindestPauseFehlend(ARV.PFLICHT_BIS_6H - gesamtPausenMin);
     return { farbe: "rot", text: `ARV: ${fehlend} min Pause fehlen (15 min Pflicht bis 6h)` };
   }
   const bisLimit = ARV.LIMIT_6H - nettoMinuten;
