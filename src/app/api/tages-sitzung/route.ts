@@ -4,9 +4,8 @@ import { z } from "zod";
 import { naechsteArvNotification, type Pause } from "@/lib/arv-berechnung";
 
 function heuteDate(): Date {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
+  const now = new Date();
+  return new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
 }
 
 function serializeDraft(r: {
