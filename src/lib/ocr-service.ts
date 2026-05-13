@@ -22,16 +22,16 @@ const ZEIT_REGEX = /\b([0-1]?\d|2[0-3]):[0-5]\d\b/g;
 function pdfZuBilder(pdfBuffer: Buffer, tmpDir: string): string[] {
   const pdfPath = join(tmpDir, "input.pdf");
   writeFileSync(pdfPath, pdfBuffer);
-  execFileSync("pdftoppm", ["-jpeg", "-r", "200", "-l", "5", pdfPath, join(tmpDir, "page")]);
+  execFileSync("pdftoppm", ["-jpeg", "-r", "300", "-l", "5", pdfPath, join(tmpDir, "page")]);
   return readdirSync(tmpDir)
     .filter(f => f.startsWith("page") && f.endsWith(".jpg"))
     .sort()
     .map(f => join(tmpDir, f));
 }
 
-function ocrSeite(bildPfad: string, tmpDir: string): string {
-  const outputBase = join(tmpDir, "out");
-  execFileSync("tesseract", [bildPfad, outputBase, "-l", "deu+eng", "--psm", "6"]);
+function ocrSeite(bildPfad: string, index: number, tmpDir: string): string {
+  const outputBase = join(tmpDir, `out_${index}`);
+  execFileSync("tesseract", [bildPfad, outputBase, "-l", "deu+eng", "--psm", "11"]);
   return readFileSync(outputBase + ".txt", "utf-8");
 }
 
@@ -53,7 +53,7 @@ export async function verarbeiteOcrBild(bildBuffer: Buffer): Promise<OcrErgebnis
       throw new Error("Keine Seiten im PDF gefunden.");
     }
 
-    const rohtext = bildPfade.map(p => ocrSeite(p, tmpDir)).join("\n");
+    const rohtext = bildPfade.map((p, i) => ocrSeite(p, i, tmpDir)).join("\n");
 
     const zeilen = rohtext.split("\n").filter(z => z.trim().length > 0);
     const extrahierteZeilen: ExtrahierteZeile[] = [];
