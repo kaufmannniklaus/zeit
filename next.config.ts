@@ -13,7 +13,6 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   output: "standalone",
-  serverExternalPackages: ["tesseract.js"],
   async headers() {
     return [
       {
