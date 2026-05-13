@@ -58,7 +58,6 @@ APP_USERNAME=<username>
 APP_PASSWORD_HASH=<bcrypt hash>
 VAPID_PUBLIC_KEY=<key>
 VAPID_PRIVATE_KEY=<key>
-ANTHROPIC_API_KEY=<key>
 ```
 
 Generate bcrypt hash: `node -e "require('bcryptjs').hash('PASS',10).then(console.log)"`
