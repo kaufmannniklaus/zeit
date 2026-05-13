@@ -1,4 +1,6 @@
-import pdfParse from "pdf-parse";
+// pdf-parse has no ESM default export; require() avoids Turbopack resolution error
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const pdfParse = require("pdf-parse") as (buffer: Buffer) => Promise<{ text: string }>;
 
 export interface TachoplusEintrag {
   datum: string;       // YYYY-MM-DD
