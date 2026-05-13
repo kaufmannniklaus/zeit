@@ -16,10 +16,11 @@ RUN npm run build
 FROM node:20-bookworm-slim AS runner
 WORKDIR /app
 
-# Tesseract-OCR Systempakete
+# Tesseract-OCR + poppler-utils (PDF → Bild Konvertierung)
 RUN apt-get update && apt-get install -y \
     tesseract-ocr \
     tesseract-ocr-deu \
+    poppler-utils \
     && rm -rf /var/lib/apt/lists/*
 
 ENV NODE_ENV=production
