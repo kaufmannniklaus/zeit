@@ -93,7 +93,16 @@ function ocrViaPdftoppm(pdfBuffer: Buffer): string {
     const pdfPath = join(dir, "input.pdf");
     writeFileSync(pdfPath, pdfBuffer);
 
-    // Render each page as 300-DPI PNG (standard for reliable OCR)
+    // First attempt: pdftotext (free if PDF has a text layer)
+    try {
+      const t = execFileSync("pdftotext", ["-layout", pdfPath, "-"]).toString("utf-8");
+      if (/\b\d{2}\.\d{2}\.\d{4}\b/.test(t)) {
+        console.log("[tachoplus] pdftotext found dates");
+        return t;
+      }
+    } catch { /* no text layer */ }
+
+    // Render each page as 300-DPI PNG
     execFileSync("pdftoppm", ["-r", "300", "-png", pdfPath, join(dir, "page")]);
 
     const pages = readdirSync(dir)
@@ -104,10 +113,11 @@ function ocrViaPdftoppm(pdfBuffer: Buffer): string {
     console.log(`[tachoplus] pdftoppm: ${pages.length} page(s)`);
 
     let text = "";
-    for (const png of pages) {
-      const outBase = join(dir, "out");
-      // PSM 4: assume single column of variable-size text — best for columnar tables
-      execFileSync("tesseract", [png, outBase, "-l", "deu+eng", "--psm", "4"]);
+    for (let i = 0; i < pages.length; i++) {
+      const outBase = join(dir, `out${i}`);
+      // PSM 11: sparse text – finds text anywhere regardless of layout (best for mixed graphics+text)
+      // --dpi 300: tell Tesseract the input resolution so it estimates character size correctly
+      execFileSync("tesseract", [pages[i], outBase, "-l", "deu+eng", "--psm", "11", "--dpi", "300"]);
       text += readFileSync(outBase + ".txt", "utf-8") + "\n";
     }
     return text;
