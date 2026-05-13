@@ -1,14 +1,52 @@
 import { inflateSync } from "zlib";
 
 export interface TachoplusEintrag {
-  datum: string;       // YYYY-MM-DD
-  startzeit: string;   // HH:MM
-  endzeit: string;     // HH:MM
+  datum: string;
+  startzeit: string;
+  endzeit: string;
   pauseMinuten: number;
   pauseBerechnet: boolean;
 }
 
-// ── PDF text extraction (no npm deps, Node.js built-ins only) ──────────────
+// ── PDF text extraction using Buffer.indexOf (works on binary data) ────────
+
+const STREAM_LF   = Buffer.from("stream\n");
+const STREAM_CRLF = Buffer.from("stream\r\n");
+const ENDSTREAM   = Buffer.from("endstream");
+
+function findStreams(pdf: Buffer): Buffer[] {
+  const result: Buffer[] = [];
+  let pos = 0;
+  while (pos < pdf.length) {
+    const lf   = pdf.indexOf(STREAM_LF,   pos);
+    const crlf = pdf.indexOf(STREAM_CRLF, pos);
+
+    let start: number;
+    let headerEnd: number;
+    if (lf === -1 && crlf === -1) break;
+    if (crlf === -1 || (lf !== -1 && lf <= crlf)) {
+      start = lf + STREAM_LF.length;
+      headerEnd = lf;
+    } else {
+      start = crlf + STREAM_CRLF.length;
+      headerEnd = crlf;
+    }
+
+    // Find the matching endstream
+    const end = pdf.indexOf(ENDSTREAM, start);
+    if (end === -1) break;
+
+    // Trim trailing \r\n before endstream
+    let contentEnd = end;
+    if (contentEnd > start && pdf[contentEnd - 1] === 0x0a) contentEnd--;
+    if (contentEnd > start && pdf[contentEnd - 1] === 0x0d) contentEnd--;
+
+    result.push(pdf.slice(start, contentEnd));
+    pos = end + ENDSTREAM.length;
+    void headerEnd;
+  }
+  return result;
+}
 
 function hexToStr(hex: string): string {
   const clean = hex.replace(/\s/g, "");
@@ -25,26 +63,26 @@ function decodeLiteral(raw: string): string {
     .replace(/\\\\/g, "\\").replace(/\\\(/g, "(").replace(/\\\)/g, ")");
 }
 
-function extractTextFromStream(content: string): string {
+function extractText(content: string): string {
   const parts: string[] = [];
-
-  // (literal string) Tj / ' / "
-  const litTj = /\(([^)\\]*(?:\\.[^)\\]*)*)\)\s*T[j'"]/g;
   let m: RegExpExecArray | null;
+
+  // (literal) Tj / ' / "
+  const litTj = /\(([^)\\]*(?:\\.[^)\\]*)*)\)\s*T[j'"]/g;
   while ((m = litTj.exec(content)) !== null) parts.push(decodeLiteral(m[1]) + " ");
 
-  // <hex string> Tj
-  const hexTj = /<([0-9a-fA-F\s]+)>\s*T[j'"]/g;
+  // <hex> Tj
+  const hexTj = /<([0-9a-fA-F\s]{2,})>\s*T[j'"]/g;
   while ((m = hexTj.exec(content)) !== null) parts.push(hexToStr(m[1]) + " ");
 
-  // [(lit/hex ...) n ...] TJ
-  const tjArr = /\[([\s\S]*?)\]\s*TJ/g;
+  // [(lit/hex...)] TJ
+  const tjArr = /\[([\s\S]{0,2000}?)\]\s*TJ/g;
   while ((m = tjArr.exec(content)) !== null) {
     const inner = m[1];
     const lit = /\(([^)\\]*(?:\\.[^)\\]*)*)\)/g;
     let s: RegExpExecArray | null;
     while ((s = lit.exec(inner)) !== null) parts.push(decodeLiteral(s[1]));
-    const hex = /<([0-9a-fA-F\s]+)>/g;
+    const hex = /<([0-9a-fA-F\s]{2,})>/g;
     while ((s = hex.exec(inner)) !== null) parts.push(hexToStr(s[1]));
     parts.push(" ");
   }
@@ -52,29 +90,22 @@ function extractTextFromStream(content: string): string {
   return parts.join("");
 }
 
-function extractPdfText(pdfBuffer: Buffer): string {
-  const raw = pdfBuffer.toString("binary");
-  const out: string[] = [];
+function extractPdfText(pdf: Buffer): string {
+  const streams = findStreams(pdf);
+  console.log("[tachoplus-parser] streams found:", streams.length);
 
-  // Find every stream...endstream block (with or without FlateDecode)
-  const streamRe = /stream\r?\n([\s\S]*?)\r?\nendstream/g;
-  let m: RegExpExecArray | null;
-  while ((m = streamRe.exec(raw)) !== null) {
-    const bytes = Buffer.from(m[1], "binary");
-
-    // Try deflate-decompress first; fall back to raw if it fails
+  const parts: string[] = [];
+  for (const stream of streams) {
     let content: string;
     try {
-      content = inflateSync(bytes).toString("binary");
+      content = inflateSync(stream).toString("latin1");
     } catch {
-      content = m[1];
+      content = stream.toString("latin1");
     }
-
-    const extracted = extractTextFromStream(content);
-    if (extracted.trim()) out.push(extracted + "\n");
+    const t = extractText(content);
+    if (t.trim()) parts.push(t + "\n");
   }
-
-  return out.join("");
+  return parts.join("");
 }
 
 // ── Time / date parsing ────────────────────────────────────────────────────
@@ -90,14 +121,12 @@ function minutenZuZeit(min: number): string {
 
 function parseSegment(d: string, mo: string, y: string, segment: string): TachoplusEintrag | null {
   const datum = `${y}-${mo}-${d}`;
-
   const alleZeiten: number[] = [];
-  let match: RegExpExecArray | null;
+  let m: RegExpExecArray | null;
   const re = /\b([0-1]?\d|2[0-3]):([0-5]\d)\b/g;
-  while ((match = re.exec(segment)) !== null) alleZeiten.push(zeitZuMinuten(match[0]));
+  while ((m = re.exec(segment)) !== null) alleZeiten.push(zeitZuMinuten(m[0]));
 
   if (alleZeiten.length < 2) return null;
-
   const wanduhrzeiten = alleZeiten.filter(t => t >= 180 && t <= 1439);
   if (wanduhrzeiten.length < 2) return null;
 
@@ -107,17 +136,14 @@ function parseSegment(d: string, mo: string, y: string, segment: string): Tachop
 
   const schichtDauer = endMin - startMin;
   const dauerwerte = alleZeiten.filter(t => t > 0 && t < 180);
-
   let pauseMinuten = 0;
   let pauseBerechnet = false;
 
   if (dauerwerte.length >= 2) {
     const sorted = [...dauerwerte].sort((a, b) => b - a);
-    const summe = sorted.slice(0, 3).reduce((a, b) => a + b, 0);
-    const berechnete = schichtDauer - summe;
+    const berechnete = schichtDauer - sorted.slice(0, 3).reduce((a, b) => a + b, 0);
     if (berechnete >= 0 && berechnete <= 120) {
-      pauseMinuten = berechnete;
-      pauseBerechnet = true;
+      pauseMinuten = berechnete; pauseBerechnet = true;
     } else {
       const kandidat = dauerwerte.find(t => t >= 15 && t <= 90);
       if (kandidat !== undefined) { pauseMinuten = kandidat; pauseBerechnet = true; }
@@ -129,14 +155,14 @@ function parseSegment(d: string, mo: string, y: string, segment: string): Tachop
 
 export async function parseTachoPlusPdf(pdfBuffer: Buffer): Promise<TachoplusEintrag[]> {
   const text = extractPdfText(pdfBuffer);
-
-  // Log raw text for debugging (first 2000 chars)
-  console.log("[tachoplus-parser] raw text sample:", text.slice(0, 2000));
+  console.log("[tachoplus-parser] total text length:", text.length, "| sample:", text.slice(0, 500).replace(/\n/g, "↵"));
 
   const treffer: Array<{ match: RegExpMatchArray; pos: number }> = [];
   let m: RegExpExecArray | null;
   const re = /\b(\d{2})\.(\d{2})\.(\d{4})\s+(Mo|Di|Mi|Do|Fr|Sa|So)\b/g;
   while ((m = re.exec(text)) !== null) treffer.push({ match: m, pos: m.index! });
+
+  console.log("[tachoplus-parser] date matches found:", treffer.length);
 
   const eintraege: TachoplusEintrag[] = [];
   const geseheneDaten = new Set<string>();
