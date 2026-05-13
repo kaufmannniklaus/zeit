@@ -129,6 +129,28 @@ function ocrViaPdftoppm(pdfBuffer: Buffer): string {
   }
 }
 
+// ── Text normalisation (collapses pdftotext char-spacing artefacts) ────────
+
+function normalizeCharSpacing(text: string): string {
+  let s = text;
+  // 8 passes: each pass collapses one layer of "digit space digit / dot / colon" artefacts
+  for (let i = 0; i < 8; i++) {
+    s = s.replace(/(\d) (\d)/g,     "$1$2")   // "2 3" → "23"
+         .replace(/(\d) \. (\d)/g,  "$1.$2")  // "2 . 0" → "2.0"
+         .replace(/(\d)\. (\d)/g,   "$1.$2")  // "2. 0" → "2.0"
+         .replace(/(\d) \.(\d)/g,   "$1.$2")  // "2 .0" → "2.0"
+         .replace(/(\d) : (\d)/g,   "$1:$2")  // "0 6 : 0 0" → "06:00"
+         .replace(/(\d): (\d)/g,    "$1:$2")
+         .replace(/(\d) :(\d)/g,    "$1:$2");
+  }
+  // Collapse char-spaced day abbreviations
+  s = s.replace(/\bM o\b/g, "Mo").replace(/\bD i\b/g, "Di")
+       .replace(/\bM i\b/g, "Mi").replace(/\bD o\b/g, "Do")
+       .replace(/\bF r\b/g, "Fr").replace(/\bS a\b/g, "Sa")
+       .replace(/\bS o\b/g, "So");
+  return s;
+}
+
 // ── Time / date parsing ────────────────────────────────────────────────────
 
 function zeitZuMinuten(z: string): number {
@@ -164,6 +186,10 @@ function parseSegment(d: string, mo: string, y: string, segment: string): Tachop
       const k = dauerwerte.find(t => t >= 15 && t <= 90);
       if (k !== undefined) { pauseMinuten = k; pauseBerechnet = true; }
     }
+  }
+  if (!pauseBerechnet) {
+    const k = dauerwerte.find(t => t >= 15 && t <= 90);
+    if (k !== undefined) { pauseMinuten = k; pauseBerechnet = true; }
   }
   return { datum, startzeit: minutenZuZeit(startMin), endzeit: minutenZuZeit(endMin), pauseMinuten, pauseBerechnet };
 }
@@ -203,7 +229,7 @@ export async function parseTachoPlusPdf(pdfBuffer: Buffer): Promise<TachoplusEin
 
   console.log(`[tachoplus] text length=${text.length} | sample: ${text.slice(0, 500).replace(/\n/g, "↵")}`);
 
-  const eintraege = parseText(text);
+  const eintraege = parseText(normalizeCharSpacing(text));
   console.log(`[tachoplus] entries found: ${eintraege.length}`);
   return eintraege;
 }
