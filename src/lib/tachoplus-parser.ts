@@ -10,40 +10,48 @@ export interface TachoplusEintrag {
 
 // ── PDF text extraction using Buffer.indexOf (works on binary data) ────────
 
-const STREAM_LF   = Buffer.from("stream\n");
-const STREAM_CRLF = Buffer.from("stream\r\n");
-const ENDSTREAM   = Buffer.from("endstream");
+const STREAM_KW  = Buffer.from("stream");
+const ENDSTREAM  = Buffer.from("endstream");
 
 function findStreams(pdf: Buffer): Buffer[] {
+  // Diagnostic: log bytes around first "stream" occurrence
+  const first = pdf.indexOf(STREAM_KW);
+  if (first !== -1) {
+    const ctx = pdf.slice(Math.max(0, first - 2), first + 12);
+    console.log("[tachoplus-parser] first 'stream' at", first, "hex:", ctx.toString("hex"));
+  } else {
+    console.log("[tachoplus-parser] keyword 'stream' NOT found in buffer, size:", pdf.length);
+    console.log("[tachoplus-parser] first 32 bytes hex:", pdf.slice(0, 32).toString("hex"));
+  }
+
   const result: Buffer[] = [];
   let pos = 0;
   while (pos < pdf.length) {
-    const lf   = pdf.indexOf(STREAM_LF,   pos);
-    const crlf = pdf.indexOf(STREAM_CRLF, pos);
+    const kwPos = pdf.indexOf(STREAM_KW, pos);
+    if (kwPos === -1) break;
 
-    let start: number;
-    let headerEnd: number;
-    if (lf === -1 && crlf === -1) break;
-    if (crlf === -1 || (lf !== -1 && lf <= crlf)) {
-      start = lf + STREAM_LF.length;
-      headerEnd = lf;
+    // Skip past "stream" keyword, then any spaces, then expect \n or \r[\n]
+    let i = kwPos + STREAM_KW.length;
+    while (i < pdf.length && pdf[i] === 0x20) i++; // skip spaces
+    if (pdf[i] === 0x0d) i++; // skip optional CR
+    if (i < pdf.length && pdf[i] === 0x0a) {
+      i++; // consume LF → valid stream marker
     } else {
-      start = crlf + STREAM_CRLF.length;
-      headerEnd = crlf;
+      // Not a stream data marker (e.g. "streamline" or inside binary)
+      pos = kwPos + STREAM_KW.length;
+      continue;
     }
 
-    // Find the matching endstream
-    const end = pdf.indexOf(ENDSTREAM, start);
-    if (end === -1) break;
+    const contentStart = i;
+    const endPos = pdf.indexOf(ENDSTREAM, contentStart);
+    if (endPos === -1) break;
 
-    // Trim trailing \r\n before endstream
-    let contentEnd = end;
-    if (contentEnd > start && pdf[contentEnd - 1] === 0x0a) contentEnd--;
-    if (contentEnd > start && pdf[contentEnd - 1] === 0x0d) contentEnd--;
+    let contentEnd = endPos;
+    if (contentEnd > contentStart && pdf[contentEnd - 1] === 0x0a) contentEnd--;
+    if (contentEnd > contentStart && pdf[contentEnd - 1] === 0x0d) contentEnd--;
 
-    result.push(pdf.slice(start, contentEnd));
-    pos = end + ENDSTREAM.length;
-    void headerEnd;
+    result.push(pdf.slice(contentStart, contentEnd));
+    pos = endPos + ENDSTREAM.length;
   }
   return result;
 }
