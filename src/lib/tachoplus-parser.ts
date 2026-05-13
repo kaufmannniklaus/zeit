@@ -1,35 +1,98 @@
-// pdf-parse is loaded lazily inside parseTachoPlusPdf to avoid DOMMatrix crash
-// at module evaluation time (Node.js 20 doesn't have DOMMatrix globally)
+import { inflateSync } from "zlib";
 
 export interface TachoplusEintrag {
   datum: string;       // YYYY-MM-DD
   startzeit: string;   // HH:MM
   endzeit: string;     // HH:MM
-  pauseMinuten: number; // 0 = nicht ermittelbar
-  pauseBerechnet: boolean; // true = aus PDF extrahiert, false = unbekannt
+  pauseMinuten: number;
+  pauseBerechnet: boolean;
 }
 
-// Findet "DD.MM.YYYY Mo/Di/..." – nur Werktage mit tatsächlichen Einträgen
-const DATUM_RE = /\b(\d{2})\.(\d{2})\.(\d{4})\s+(Mo|Di|Mi|Do|Fr|Sa|So)\b/g;
-// Zeitwert HH:MM
-const ZEIT_RE = /\b([0-1]?\d|2[0-3]):([0-5]\d)\b/g;
+// Extracts all visible text from a PDF using only Node.js built-ins (no npm).
+// Handles FlateDecode-compressed and uncompressed content streams.
+function extractPdfText(pdfBuffer: Buffer): string {
+  // Work in binary (latin1) to preserve raw byte values
+  const data = pdfBuffer.toString("binary");
+  const parts: string[] = [];
+
+  // Match every stream...endstream block together with its dictionary header
+  const streamRe = /(<<[\s\S]{1,1000}?>>)\s*stream\r?\n([\s\S]*?)\r?\nendstream/g;
+  let m: RegExpExecArray | null;
+
+  while ((m = streamRe.exec(data)) !== null) {
+    const header = m[1];
+    const raw = m[2];
+
+    let content = raw;
+
+    if (header.includes("/FlateDecode")) {
+      try {
+        content = inflateSync(Buffer.from(raw, "binary")).toString("binary");
+      } catch {
+        continue;
+      }
+    }
+
+    // Skip non-text streams (images, fonts, etc.) – only keep streams that
+    // contain PDF text operators
+    if (!content.includes(" Tj") && !content.includes(") Tj") && !content.includes("] TJ")) {
+      continue;
+    }
+
+    // Extract literal strings from BT...ET text blocks
+    const btRe = /BT([\s\S]*?)ET/g;
+    let bt: RegExpExecArray | null;
+    while ((bt = btRe.exec(content)) !== null) {
+      const block = bt[1];
+
+      // (string) Tj  or  (string) '
+      const tjRe = /\(([^)\\]*(?:\\.[^)\\]*)*)\)\s*T[j'"]/g;
+      let tj: RegExpExecArray | null;
+      while ((tj = tjRe.exec(block)) !== null) {
+        parts.push(decodePdfString(tj[1]));
+      }
+
+      // [(str1) n (str2) ...] TJ
+      const tjArrRe = /\[([\s\S]*?)\]\s*TJ/g;
+      let tja: RegExpExecArray | null;
+      while ((tja = tjArrRe.exec(block)) !== null) {
+        const strRe = /\(([^)\\]*(?:\\.[^)\\]*)*)\)/g;
+        let s: RegExpExecArray | null;
+        while ((s = strRe.exec(tja[1])) !== null) {
+          parts.push(decodePdfString(s[1]));
+        }
+        parts.push(" ");
+      }
+
+      parts.push("\n");
+    }
+  }
+
+  return parts.join("");
+}
+
+function decodePdfString(raw: string): string {
+  return raw
+    .replace(/\\n/g, "\n")
+    .replace(/\\r/g, "\r")
+    .replace(/\\t/g, "\t")
+    .replace(/\\\\/g, "\\")
+    .replace(/\\\(/g, "(")
+    .replace(/\\\)/g, ")");
+}
 
 function zeitZuMinuten(z: string): number {
-  const [h, m] = z.split(":").map(Number);
-  return h * 60 + m;
+  const [h, min] = z.split(":").map(Number);
+  return h * 60 + min;
 }
 
 function minutenZuZeit(min: number): string {
   return `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
 }
 
-function parseSegment(
-  d: string, m: string, y: string,
-  segment: string
-): TachoplusEintrag | null {
-  const datum = `${y}-${m}-${d}`;
+function parseSegment(d: string, mo: string, y: string, segment: string): TachoplusEintrag | null {
+  const datum = `${y}-${mo}-${d}`;
 
-  // Alle Zeitwerte aus dem Segment extrahieren
   const alleZeiten: number[] = [];
   let match;
   const re = /\b([0-1]?\d|2[0-3]):([0-5]\d)\b/g;
@@ -39,7 +102,6 @@ function parseSegment(
 
   if (alleZeiten.length < 2) return null;
 
-  // Wanduhrzeiten: >= 03:00 und <= 23:59 (Anfang + Ende sind Tageszeiten)
   const wanduhrzeiten = alleZeiten.filter(t => t >= 180 && t <= 1439);
   if (wanduhrzeiten.length < 2) return null;
 
@@ -48,18 +110,12 @@ function parseSegment(
   if (endMin <= startMin || endMin - startMin > 16 * 60) return null;
 
   const schichtDauer = endMin - startMin;
-
-  // Pause: nach Anfang/Ende suche nach Dauer-Werten im plausiblen Bereich (15–120 min)
-  // Dauerwerte sind < 180 min (keine Wanduhrzeit)
   const dauerwerte = alleZeiten.filter(t => t > 0 && t < 180);
 
-  // Heuristik: Pause ≈ Schichtdauer minus Summe der grössten Arbeitskategorien
-  // Wenn Summe aller Dauerwerte annähernd Schichtdauer = sind es Arbeitskategorien
   let pauseMinuten = 0;
   let pauseBerechnet = false;
 
   if (dauerwerte.length >= 2) {
-    // Sortiere absteigend – grösste Werte sind wahrscheinlich Lenken, Sonstige, Bereitschaft
     const sorted = [...dauerwerte].sort((a, b) => b - a);
     const summe = sorted.slice(0, 3).reduce((a, b) => a + b, 0);
     const berechnete = schichtDauer - summe;
@@ -68,7 +124,6 @@ function parseSegment(
       pauseMinuten = berechnete;
       pauseBerechnet = true;
     } else {
-      // Fallback: kleinsten plausiblen Wert (15–90 min) nehmen
       const kandidat = dauerwerte.find(t => t >= 15 && t <= 90);
       if (kandidat !== undefined) {
         pauseMinuten = kandidat;
@@ -77,41 +132,14 @@ function parseSegment(
     }
   }
 
-  return {
-    datum,
-    startzeit: minutenZuZeit(startMin),
-    endzeit: minutenZuZeit(endMin),
-    pauseMinuten,
-    pauseBerechnet,
-  };
+  return { datum, startzeit: minutenZuZeit(startMin), endzeit: minutenZuZeit(endMin), pauseMinuten, pauseBerechnet };
 }
 
 export async function parseTachoPlusPdf(pdfBuffer: Buffer): Promise<TachoplusEintrag[]> {
-  // Polyfill + lazy require here so pdf-parse is never loaded at module evaluation time
-  if (typeof globalThis.DOMMatrix === "undefined") {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (globalThis as any).DOMMatrix = class DOMMatrix {
-      a=1;b=0;c=0;d=1;e=0;f=0;
-      m11=1;m12=0;m13=0;m14=0;m21=0;m22=1;m23=0;m24=0;
-      m31=0;m32=0;m33=1;m34=0;m41=0;m42=0;m43=0;m44=1;
-      is2D=true; isIdentity=true;
-      constructor(_?: string | number[]) {}
-      multiply() { return this; }
-      inverse() { return this; }
-      translate() { return this; }
-      scale() { return this; }
-      rotate() { return this; }
-      transformPoint(p: {x:number;y:number}) { return p; }
-    };
-  }
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const mod = require("pdf-parse");
-  const pdfParse = (mod.default ?? mod) as (buf: Buffer) => Promise<{ text: string }>;
-  const { text } = await pdfParse(pdfBuffer);
+  const text = extractPdfText(pdfBuffer);
 
-  // Alle Datumstreffer mit Position finden
   const treffer: Array<{ match: RegExpMatchArray; pos: number }> = [];
-  let m;
+  let m: RegExpExecArray | null;
   const re = /\b(\d{2})\.(\d{2})\.(\d{4})\s+(Mo|Di|Mi|Do|Fr|Sa|So)\b/g;
   while ((m = re.exec(text)) !== null) {
     treffer.push({ match: m, pos: m.index! });
@@ -123,7 +151,6 @@ export async function parseTachoPlusPdf(pdfBuffer: Buffer): Promise<TachoplusEin
   for (let i = 0; i < treffer.length; i++) {
     const { match, pos } = treffer[i];
     const [, d, mo, y] = match;
-    // Segment bis zum nächsten Datum-Treffer (max. 300 Zeichen)
     const segmentEnde = treffer[i + 1]?.pos ?? pos + 300;
     const segment = text.slice(pos + match[0].length, segmentEnde);
 

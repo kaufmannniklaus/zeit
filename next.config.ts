@@ -13,8 +13,7 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   output: "standalone",
-  serverExternalPackages: ["pdf-parse"],
-  async headers() {
+async headers() {
     return [
       {
         source: "/(.*)",
