@@ -105,7 +105,8 @@ export async function parseTachoPlusPdf(pdfBuffer: Buffer): Promise<TachoplusEin
     };
   }
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const pdfParse = require("pdf-parse") as (buf: Buffer) => Promise<{ text: string }>;
+  const mod = require("pdf-parse");
+  const pdfParse = (mod.default ?? mod) as (buf: Buffer) => Promise<{ text: string }>;
   const { text } = await pdfParse(pdfBuffer);
 
   // Alle Datumstreffer mit Position finden
