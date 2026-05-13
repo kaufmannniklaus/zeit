@@ -27,6 +27,19 @@ export function ScanClient() {
   const [vergleichLoading, setVergleichLoading] = useState(false);
   const [vergleichError, setVergleichError] = useState<string | null>(null);
 
+  function handleOcrComplete(result: OcrResult) {
+    setOcrResult(result);
+    // Datumsbereich automatisch aus OCR-Ergebnis setzen
+    const daten = result.extrahierteZeilen.map(z => z.datum).filter(Boolean) as string[];
+    if (daten.length > 0) {
+      const von = daten.reduce((a, b) => (a < b ? a : b));
+      const bis = daten.reduce((a, b) => (a > b ? a : b));
+      setVonDatum(von);
+      setBisDatum(bis);
+      ladeEintraege(von, bis);
+    }
+  }
+
   async function ladeEintraege(von: string, bis: string) {
     if (!von || !bis) return;
 
@@ -84,7 +97,7 @@ export function ScanClient() {
         </p>
       </div>
 
-      <BildUpload onOcrComplete={setOcrResult} />
+      <BildUpload onOcrComplete={handleOcrComplete} />
 
       {ocrResult && (
         <>

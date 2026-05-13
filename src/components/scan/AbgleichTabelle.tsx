@@ -1,19 +1,7 @@
 "use client";
 
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-} from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import type { ExtrahierteZeile } from "@/types/ocr";
 
@@ -30,58 +18,65 @@ interface AbgleichTabelleProps {
 }
 
 function zeitZuMinuten(zeit: string): number {
-  const [stunden, minuten] = zeit.split(":").map(Number);
-  return (stunden || 0) * 60 + (minuten || 0);
+  const [h, m] = zeit.split(":").map(Number);
+  return (h || 0) * 60 + (m || 0);
 }
 
-function zeitenWeichenAb(a?: string, b?: string, schwelle = 5): boolean {
+function weichtAb(a?: string, b?: string, schwelle = 5): boolean {
   if (!a || !b) return true;
   return Math.abs(zeitZuMinuten(a) - zeitZuMinuten(b)) > schwelle;
 }
 
-export function AbgleichTabelle({
-  extrahierteZeilen,
-  erfassteEintraege,
-}: AbgleichTabelleProps) {
-  const maxRows = Math.max(extrahierteZeilen.length, erfassteEintraege.length);
+function formatDatum(iso?: string): string {
+  if (!iso) return "–";
+  const [y, m, d] = iso.split("-");
+  return `${d}.${m}.${y}`;
+}
+
+export function AbgleichTabelle({ extrahierteZeilen, erfassteEintraege }: AbgleichTabelleProps) {
+  const hatDaten = extrahierteZeilen.some(z => z.datum);
+
+  // Datum-basierter Abgleich wenn Claude API genutzt wurde
+  const erfasstByDatum = new Map(erfassteEintraege.map(e => [e.datum, e]));
+
+  // Alle Datümer sammeln (OCR + Erfasst), sortieren
+  const alleDaten = hatDaten
+    ? [...new Set([
+        ...extrahierteZeilen.map(z => z.datum!),
+        ...erfassteEintraege.map(e => e.datum),
+      ])].sort()
+    : null;
+
+  const ocrByDatum = new Map(extrahierteZeilen.filter(z => z.datum).map(z => [z.datum!, z]));
+
   let abweichungen = 0;
 
-  const zeilen = Array.from({ length: maxRows }, (_, i) => {
-    const ocr = extrahierteZeilen[i] || null;
-    const erfasst = erfassteEintraege[i] || null;
+  const zeilen = alleDaten
+    ? alleDaten.map((datum, i) => {
+        const ocr = ocrByDatum.get(datum) ?? null;
+        const erfasst = erfasstByDatum.get(datum) ?? null;
+        const startAbw = ocr && erfasst ? weichtAb(ocr.startzeit, erfasst.startzeit) : !!(ocr || erfasst);
+        const endAbw = ocr && erfasst ? weichtAb(ocr.endzeit, erfasst.endzeit) : !!(ocr || erfasst);
+        const hatAbw = !ocr || !erfasst || startAbw || endAbw;
+        if (hatAbw) abweichungen++;
+        return { index: i, datum, ocr, erfasst, startAbw, endAbw, nurOcr: !!ocr && !erfasst, nurErfasst: !ocr && !!erfasst };
+      })
+    : Array.from({ length: Math.max(extrahierteZeilen.length, erfassteEintraege.length) }, (_, i) => {
+        const ocr = extrahierteZeilen[i] ?? null;
+        const erfasst = erfassteEintraege[i] ?? null;
+        const startAbw = ocr && erfasst ? weichtAb(ocr.startzeit, erfasst.startzeit) : false;
+        const endAbw = ocr && erfasst ? weichtAb(ocr.endzeit, erfasst.endzeit) : false;
+        const hatAbw = !ocr || !erfasst || startAbw || endAbw;
+        if (hatAbw) abweichungen++;
+        return { index: i, datum: undefined as string | undefined, ocr, erfasst, startAbw, endAbw, nurOcr: !!ocr && !erfasst, nurErfasst: !ocr && !!erfasst };
+      });
 
-    const keineErfasst = ocr && !erfasst;
-    const keineOcr = !ocr && erfasst;
-    const startAbweichung =
-      ocr && erfasst ? zeitenWeichenAb(ocr.startzeit, erfasst.startzeit) : false;
-    const endAbweichung =
-      ocr && erfasst ? zeitenWeichenAb(ocr.endzeit, erfasst.endzeit) : false;
-
-    const hatAbweichung =
-      keineErfasst || keineOcr || startAbweichung || endAbweichung;
-    if (hatAbweichung) abweichungen++;
-
-    return {
-      index: i,
-      ocr,
-      erfasst,
-      keineErfasst,
-      keineOcr,
-      startAbweichung,
-      endAbweichung,
-    };
-  });
-
-  if (maxRows === 0) {
+  if (zeilen.length === 0) {
     return (
       <Card>
-        <CardHeader>
-          <CardTitle>Abgleich</CardTitle>
-        </CardHeader>
+        <CardHeader><CardTitle>Abgleich</CardTitle></CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">
-            Keine Daten zum Vergleichen vorhanden.
-          </p>
+          <p className="text-sm text-muted-foreground">Keine Daten zum Vergleichen vorhanden.</p>
         </CardContent>
       </Card>
     );
@@ -89,27 +84,18 @@ export function AbgleichTabelle({
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Abgleich</CardTitle>
-      </CardHeader>
+      <CardHeader><CardTitle>Abgleich</CardTitle></CardHeader>
       <CardContent className="space-y-4">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-10">#</TableHead>
-                <TableHead
-                  colSpan={2}
-                  className="border-r text-center font-semibold"
-                >
-                  Scan (OCR)
-                </TableHead>
-                <TableHead colSpan={2} className="text-center font-semibold">
-                  Erfasst
-                </TableHead>
+                {hatDaten && <TableHead>Datum</TableHead>}
+                <TableHead colSpan={2} className="border-r text-center font-semibold">Scan (Firma)</TableHead>
+                <TableHead colSpan={2} className="text-center font-semibold">Erfasst</TableHead>
               </TableRow>
               <TableRow>
-                <TableHead className="w-10" />
+                {hatDaten && <TableHead />}
                 <TableHead>Start</TableHead>
                 <TableHead className="border-r">Ende</TableHead>
                 <TableHead>Start</TableHead>
@@ -117,56 +103,41 @@ export function AbgleichTabelle({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {zeilen.map((z) => {
-                let rowClass = "";
-                if (z.keineErfasst) rowClass = "bg-red-50 dark:bg-red-950/30";
-                else if (z.keineOcr) rowClass = "bg-orange-50 dark:bg-orange-950/30";
-
-                return (
-                  <TableRow key={z.index} className={rowClass}>
-                    <TableCell className="font-mono text-xs">
-                      {z.index + 1}
+              {zeilen.map((z) => (
+                <TableRow
+                  key={z.datum ?? z.index}
+                  className={z.nurOcr ? "bg-red-50 dark:bg-red-950/30" : z.nurErfasst ? "bg-orange-50 dark:bg-orange-950/30" : ""}
+                >
+                  {hatDaten && (
+                    <TableCell className="font-mono text-xs whitespace-nowrap">
+                      {formatDatum(z.datum)}
                     </TableCell>
-                    <TableCell>
-                      {z.ocr?.startzeit || "-"}
-                    </TableCell>
-                    <TableCell className="border-r">
-                      {z.ocr?.endzeit || "-"}
-                    </TableCell>
-                    <TableCell
-                      className={
-                        z.startAbweichung
-                          ? "bg-yellow-50 text-yellow-900 dark:bg-yellow-950/30 dark:text-yellow-200"
-                          : ""
-                      }
-                    >
-                      {z.erfasst?.startzeit || "-"}
-                    </TableCell>
-                    <TableCell
-                      className={
-                        z.endAbweichung
-                          ? "bg-yellow-50 text-yellow-900 dark:bg-yellow-950/30 dark:text-yellow-200"
-                          : ""
-                      }
-                    >
-                      {z.erfasst?.endzeit || "-"}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
+                  )}
+                  <TableCell className={z.startAbw && z.erfasst ? "bg-yellow-50 text-yellow-900 dark:bg-yellow-950/30 dark:text-yellow-200" : ""}>
+                    {z.ocr?.startzeit ?? "–"}
+                  </TableCell>
+                  <TableCell className={`border-r ${z.endAbw && z.erfasst ? "bg-yellow-50 text-yellow-900 dark:bg-yellow-950/30 dark:text-yellow-200" : ""}`}>
+                    {z.ocr?.endzeit ?? "–"}
+                  </TableCell>
+                  <TableCell className={z.startAbw && z.ocr ? "bg-yellow-50 text-yellow-900 dark:bg-yellow-950/30 dark:text-yellow-200" : ""}>
+                    {z.erfasst?.startzeit ?? "–"}
+                  </TableCell>
+                  <TableCell className={z.endAbw && z.ocr ? "bg-yellow-50 text-yellow-900 dark:bg-yellow-950/30 dark:text-yellow-200" : ""}>
+                    {z.erfasst?.endzeit ?? "–"}
+                  </TableCell>
+                </TableRow>
+              ))}
             </TableBody>
           </Table>
         </div>
 
         {abweichungen > 0 ? (
           <Alert variant="destructive">
-            <AlertDescription>
-              {abweichungen} Abweichung{abweichungen !== 1 ? "en" : ""} gefunden
-            </AlertDescription>
+            <AlertDescription>{abweichungen} Abweichung{abweichungen !== 1 ? "en" : ""} gefunden</AlertDescription>
           </Alert>
         ) : (
           <Alert className="border-green-200 bg-green-50 text-green-900 dark:border-green-800 dark:bg-green-950/30 dark:text-green-200">
-            <AlertDescription>Keine Abweichungen gefunden</AlertDescription>
+            <AlertDescription>Keine Abweichungen gefunden ✓</AlertDescription>
           </Alert>
         )}
       </CardContent>
