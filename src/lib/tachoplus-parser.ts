@@ -1,4 +1,7 @@
 import { inflateSync } from "zlib";
+import { execFileSync, writeFileSync, readFileSync, rmSync, mkdtempSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
 
 export interface TachoplusEintrag {
   datum: string;
@@ -8,36 +11,37 @@ export interface TachoplusEintrag {
   pauseBerechnet: boolean;
 }
 
-// ── PDF text extraction using Buffer.indexOf (works on binary data) ────────
+// ── PDF stream extraction ──────────────────────────────────────────────────
 
-const STREAM_KW  = Buffer.from("stream");
-const ENDSTREAM  = Buffer.from("endstream");
+interface PdfStream {
+  content: Buffer;
+  isJpeg: boolean;
+}
 
-function findStreams(pdf: Buffer): Buffer[] {
-  // Diagnostic: log bytes around first "stream" occurrence
-  const first = pdf.indexOf(STREAM_KW);
-  if (first !== -1) {
-    const ctx = pdf.slice(Math.max(0, first - 2), first + 12);
-    console.log("[tachoplus-parser] first 'stream' at", first, "hex:", ctx.toString("hex"));
-  } else {
-    console.log("[tachoplus-parser] keyword 'stream' NOT found in buffer, size:", pdf.length);
-    console.log("[tachoplus-parser] first 32 bytes hex:", pdf.slice(0, 32).toString("hex"));
-  }
+const STREAM_KW = Buffer.from("stream");
+const ENDSTREAM = Buffer.from("endstream");
+const JPEG_SOI  = Buffer.from([0xff, 0xd8]);
 
-  const result: Buffer[] = [];
+function findStreams(pdf: Buffer): PdfStream[] {
+  const result: PdfStream[] = [];
   let pos = 0;
+
   while (pos < pdf.length) {
     const kwPos = pdf.indexOf(STREAM_KW, pos);
     if (kwPos === -1) break;
 
-    // Skip past "stream" keyword, then any spaces, then expect \n or \r[\n]
     let i = kwPos + STREAM_KW.length;
-    while (i < pdf.length && pdf[i] === 0x20) i++; // skip spaces
-    if (pdf[i] === 0x0d) i++; // skip optional CR
-    if (i < pdf.length && pdf[i] === 0x0a) {
-      i++; // consume LF → valid stream marker
+    // Skip optional trailing spaces (some generators add them)
+    while (i < pdf.length && pdf[i] === 0x20) i++;
+
+    // PDF spec: stream keyword followed by CR, LF, or CRLF
+    if (pdf[i] === 0x0d) {
+      i++; // CR
+      if (i < pdf.length && pdf[i] === 0x0a) i++; // optional LF after CR
+    } else if (pdf[i] === 0x0a) {
+      i++; // LF only
     } else {
-      // Not a stream data marker (e.g. "streamline" or inside binary)
+      // Not a valid stream marker (e.g. word "streamline" or binary content)
       pos = kwPos + STREAM_KW.length;
       continue;
     }
@@ -50,18 +54,31 @@ function findStreams(pdf: Buffer): Buffer[] {
     if (contentEnd > contentStart && pdf[contentEnd - 1] === 0x0a) contentEnd--;
     if (contentEnd > contentStart && pdf[contentEnd - 1] === 0x0d) contentEnd--;
 
-    result.push(pdf.slice(contentStart, contentEnd));
+    const raw = pdf.slice(contentStart, contentEnd);
+
+    // Try deflate decompression; if it fails the stream is uncompressed
+    let content: Buffer;
+    try {
+      content = inflateSync(raw);
+    } catch {
+      content = raw;
+    }
+
+    const isJpeg = content.length > 2 && content[0] === JPEG_SOI[0] && content[1] === JPEG_SOI[1];
+    result.push({ content, isJpeg });
     pos = endPos + ENDSTREAM.length;
   }
+
   return result;
 }
+
+// ── Text extraction from content streams ──────────────────────────────────
 
 function hexToStr(hex: string): string {
   const clean = hex.replace(/\s/g, "");
   let r = "";
-  for (let i = 0; i + 1 < clean.length; i += 2) {
+  for (let i = 0; i + 1 < clean.length; i += 2)
     r += String.fromCharCode(parseInt(clean.slice(i, i + 2), 16));
-  }
   return r;
 }
 
@@ -71,21 +88,19 @@ function decodeLiteral(raw: string): string {
     .replace(/\\\\/g, "\\").replace(/\\\(/g, "(").replace(/\\\)/g, ")");
 }
 
-function extractText(content: string): string {
+function extractTextFromContent(content: Buffer): string {
+  const str = content.toString("latin1");
   const parts: string[] = [];
   let m: RegExpExecArray | null;
 
-  // (literal) Tj / ' / "
   const litTj = /\(([^)\\]*(?:\\.[^)\\]*)*)\)\s*T[j'"]/g;
-  while ((m = litTj.exec(content)) !== null) parts.push(decodeLiteral(m[1]) + " ");
+  while ((m = litTj.exec(str)) !== null) parts.push(decodeLiteral(m[1]) + " ");
 
-  // <hex> Tj
   const hexTj = /<([0-9a-fA-F\s]{2,})>\s*T[j'"]/g;
-  while ((m = hexTj.exec(content)) !== null) parts.push(hexToStr(m[1]) + " ");
+  while ((m = hexTj.exec(str)) !== null) parts.push(hexToStr(m[1]) + " ");
 
-  // [(lit/hex...)] TJ
   const tjArr = /\[([\s\S]{0,2000}?)\]\s*TJ/g;
-  while ((m = tjArr.exec(content)) !== null) {
+  while ((m = tjArr.exec(str)) !== null) {
     const inner = m[1];
     const lit = /\(([^)\\]*(?:\\.[^)\\]*)*)\)/g;
     let s: RegExpExecArray | null;
@@ -98,22 +113,22 @@ function extractText(content: string): string {
   return parts.join("");
 }
 
-function extractPdfText(pdf: Buffer): string {
-  const streams = findStreams(pdf);
-  console.log("[tachoplus-parser] streams found:", streams.length);
+// ── Tesseract OCR for JPEG streams ─────────────────────────────────────────
 
-  const parts: string[] = [];
-  for (const stream of streams) {
-    let content: string;
-    try {
-      content = inflateSync(stream).toString("latin1");
-    } catch {
-      content = stream.toString("latin1");
-    }
-    const t = extractText(content);
-    if (t.trim()) parts.push(t + "\n");
+function ocrJpeg(jpeg: Buffer): string {
+  const dir = mkdtempSync(join(tmpdir(), "tachoocr-"));
+  try {
+    const imgPath = join(dir, "page.jpg");
+    const outBase = join(dir, "out");
+    writeFileSync(imgPath, jpeg);
+    // --psm 6: assume uniform block of text (better for tables than --psm 11)
+    execFileSync("tesseract", [imgPath, outBase, "-l", "deu+eng", "--psm", "6"]);
+    return readFileSync(outBase + ".txt", "utf-8");
+  } catch {
+    return "";
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
-  return parts.join("");
 }
 
 // ── Time / date parsing ────────────────────────────────────────────────────
@@ -139,22 +154,21 @@ function parseSegment(d: string, mo: string, y: string, segment: string): Tachop
   if (wanduhrzeiten.length < 2) return null;
 
   const startMin = wanduhrzeiten[0];
-  const endMin = wanduhrzeiten[1];
+  const endMin   = wanduhrzeiten[1];
   if (endMin <= startMin || endMin - startMin > 16 * 60) return null;
 
   const schichtDauer = endMin - startMin;
-  const dauerwerte = alleZeiten.filter(t => t > 0 && t < 180);
-  let pauseMinuten = 0;
-  let pauseBerechnet = false;
+  const dauerwerte   = alleZeiten.filter(t => t > 0 && t < 180);
+  let pauseMinuten = 0, pauseBerechnet = false;
 
   if (dauerwerte.length >= 2) {
-    const sorted = [...dauerwerte].sort((a, b) => b - a);
+    const sorted    = [...dauerwerte].sort((a, b) => b - a);
     const berechnete = schichtDauer - sorted.slice(0, 3).reduce((a, b) => a + b, 0);
     if (berechnete >= 0 && berechnete <= 120) {
       pauseMinuten = berechnete; pauseBerechnet = true;
     } else {
-      const kandidat = dauerwerte.find(t => t >= 15 && t <= 90);
-      if (kandidat !== undefined) { pauseMinuten = kandidat; pauseBerechnet = true; }
+      const k = dauerwerte.find(t => t >= 15 && t <= 90);
+      if (k !== undefined) { pauseMinuten = k; pauseBerechnet = true; }
     }
   }
 
@@ -162,30 +176,42 @@ function parseSegment(d: string, mo: string, y: string, segment: string): Tachop
 }
 
 export async function parseTachoPlusPdf(pdfBuffer: Buffer): Promise<TachoplusEintrag[]> {
-  const text = extractPdfText(pdfBuffer);
-  console.log("[tachoplus-parser] total text length:", text.length, "| sample:", text.slice(0, 500).replace(/\n/g, "↵"));
+  const streams = findStreams(pdfBuffer);
+  const jpegStreams = streams.filter(s => s.isJpeg && s.content.length > 50_000);
+  const textStreams = streams.filter(s => !s.isJpeg);
 
+  console.log(`[tachoplus] streams=${streams.length} jpeg=${jpegStreams.length} text=${textStreams.length}`);
+
+  // 1. Try text layer extraction
+  let text = textStreams.map(s => extractTextFromContent(s.content)).join("\n");
+
+  // 2. If no useful text, OCR the JPEG page images
+  if (text.trim().length < 30 && jpegStreams.length > 0) {
+    console.log("[tachoplus] no text layer – falling back to Tesseract OCR");
+    text = jpegStreams.map(s => ocrJpeg(s.content)).join("\n");
+  }
+
+  console.log(`[tachoplus] text length=${text.length} sample: ${text.slice(0, 400).replace(/\n/g, "↵")}`);
+
+  // 3. Parse text for date+time entries
   const treffer: Array<{ match: RegExpMatchArray; pos: number }> = [];
   let m: RegExpExecArray | null;
   const re = /\b(\d{2})\.(\d{2})\.(\d{4})\s+(Mo|Di|Mi|Do|Fr|Sa|So)\b/g;
   while ((m = re.exec(text)) !== null) treffer.push({ match: m, pos: m.index! });
 
-  console.log("[tachoplus-parser] date matches found:", treffer.length);
+  console.log(`[tachoplus] date matches=${treffer.length}`);
 
   const eintraege: TachoplusEintrag[] = [];
-  const geseheneDaten = new Set<string>();
+  const gesehen = new Set<string>();
 
   for (let i = 0; i < treffer.length; i++) {
     const { match, pos } = treffer[i];
     const [, d, mo, y] = match;
-    const segmentEnde = treffer[i + 1]?.pos ?? pos + 300;
-    const segment = text.slice(pos + match[0].length, segmentEnde);
+    const segEnd  = treffer[i + 1]?.pos ?? pos + 300;
+    const segment = text.slice(pos + match[0].length, segEnd);
     const eintrag = parseSegment(d, mo, y, segment);
-    const datumKey = `${y}-${mo}-${d}`;
-    if (eintrag && !geseheneDaten.has(datumKey)) {
-      geseheneDaten.add(datumKey);
-      eintraege.push(eintrag);
-    }
+    const key     = `${y}-${mo}-${d}`;
+    if (eintrag && !gesehen.has(key)) { gesehen.add(key); eintraege.push(eintrag); }
   }
 
   return eintraege.sort((a, b) => a.datum.localeCompare(b.datum));
