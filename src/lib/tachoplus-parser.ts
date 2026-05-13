@@ -1,5 +1,6 @@
 import { inflateSync } from "zlib";
-import { execFileSync, writeFileSync, readFileSync, rmSync, mkdtempSync } from "fs";
+import { execFileSync } from "child_process";
+import { writeFileSync, readFileSync, rmSync, mkdtempSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 
