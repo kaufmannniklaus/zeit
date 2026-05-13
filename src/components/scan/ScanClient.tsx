@@ -8,9 +8,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import type { OcrResult } from "@/types/ocr";
+import type { UebernahmeEintrag } from "@/components/scan/AbgleichTabelle";
 import type { ZeitEintrag } from "@/types/index";
 
 interface ZeitEintragSimple {
+  id: string;
   datum: string;
   startzeit: string;
   endzeit: string;
@@ -44,6 +46,7 @@ export function ScanClient() {
       const json = await response.json();
       const eintraege: ZeitEintragSimple[] = (json.data || []).map(
         (e: ZeitEintrag) => ({
+          id: e.id,
           datum: e.datum,
           startzeit: e.startzeit,
           endzeit: e.endzeit,
@@ -57,6 +60,21 @@ export function ScanClient() {
       setVergleichsEintraege([]);
     } finally {
       setVergleichLoading(false);
+    }
+  }
+
+  function handleOcrComplete(result: OcrResult) {
+    setOcrResult(result);
+    const daten = result.extrahierteZeilen
+      .map(z => z.datum)
+      .filter((d): d is string => !!d)
+      .sort();
+    if (daten.length > 0) {
+      const von = daten[0];
+      const bis = daten[daten.length - 1];
+      setVonDatum(von);
+      setBisDatum(bis);
+      ladeEintraege(von, bis);
     }
   }
 
@@ -74,6 +92,27 @@ export function ScanClient() {
     }
   }
 
+  async function handleUebernehmen(eintraege: UebernahmeEintrag[]) {
+    for (const e of eintraege) {
+      const response = await fetch(`/api/zeiteintraege/${e.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          datum: e.datum,
+          startzeit: e.startzeit,
+          endzeit: e.endzeit,
+          pauseDauer: e.pauseDauer,
+        }),
+      });
+      if (!response.ok) {
+        throw new Error(`Fehler beim Speichern von ${e.datum}`);
+      }
+    }
+    if (vonDatum && bisDatum) {
+      await ladeEintraege(vonDatum, bisDatum);
+    }
+  }
+
   return (
     <div className="max-w-4xl space-y-6">
       <div>
@@ -84,7 +123,7 @@ export function ScanClient() {
         </p>
       </div>
 
-      <BildUpload onOcrComplete={setOcrResult} />
+      <BildUpload onOcrComplete={handleOcrComplete} />
 
       {ocrResult && (
         <>
@@ -134,6 +173,7 @@ export function ScanClient() {
             <AbgleichTabelle
               extrahierteZeilen={ocrResult.extrahierteZeilen}
               erfassteEintraege={vergleichsEintraege}
+              onUebernehmen={handleUebernehmen}
             />
           )}
         </>

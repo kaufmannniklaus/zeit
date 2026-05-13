@@ -1,9 +1,12 @@
 export interface ExtrahierteZeile {
   zeile: number;
   rohtext: string;
-  startzeit?: string;
-  endzeit?: string;
-  pause?: string;
+  datum?: string;          // YYYY-MM-DD
+  startzeit?: string;      // HH:MM
+  endzeit?: string;        // HH:MM
+  pauseMinuten?: number;   // Minuten
+  pauseBerechnet?: boolean; // false = Schätzung, true = aus PDF
+  pause?: string;          // legacy Tesseract
 }
 
 export interface OcrResult {

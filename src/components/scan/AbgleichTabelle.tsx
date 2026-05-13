@@ -1,23 +1,16 @@
 "use client";
 
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-} from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { useState } from "react";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { CheckCircle, AlertTriangle } from "lucide-react";
 import type { ExtrahierteZeile } from "@/types/ocr";
 
 interface ZeitEintragSimple {
+  id: string;
   datum: string;
   startzeit: string;
   endzeit: string;
@@ -27,147 +20,198 @@ interface ZeitEintragSimple {
 interface AbgleichTabelleProps {
   extrahierteZeilen: ExtrahierteZeile[];
   erfassteEintraege: ZeitEintragSimple[];
+  onUebernehmen: (eintraege: UebernahmeEintrag[]) => Promise<void>;
 }
 
-function zeitZuMinuten(zeit: string): number {
-  const [stunden, minuten] = zeit.split(":").map(Number);
-  return (stunden || 0) * 60 + (minuten || 0);
+export interface UebernahmeEintrag {
+  id: string;
+  datum: string;
+  startzeit: string;
+  endzeit: string;
+  pauseDauer: number;
 }
 
-function zeitenWeichenAb(a?: string, b?: string, schwelle = 5): boolean {
-  if (!a || !b) return true;
-  return Math.abs(zeitZuMinuten(a) - zeitZuMinuten(b)) > schwelle;
+function zeitZuMin(z: string): number {
+  const [h, m] = z.split(":").map(Number);
+  return h * 60 + m;
 }
 
-export function AbgleichTabelle({
-  extrahierteZeilen,
-  erfassteEintraege,
-}: AbgleichTabelleProps) {
-  const maxRows = Math.max(extrahierteZeilen.length, erfassteEintraege.length);
-  let abweichungen = 0;
+function abw(a?: string | number, b?: string | number, schwelle = 5): boolean {
+  if (a === undefined || b === undefined) return true;
+  if (typeof a === "string" && typeof b === "string") {
+    return Math.abs(zeitZuMin(a) - zeitZuMin(b)) > schwelle;
+  }
+  return Math.abs(Number(a) - Number(b)) > schwelle;
+}
 
-  const zeilen = Array.from({ length: maxRows }, (_, i) => {
-    const ocr = extrahierteZeilen[i] || null;
-    const erfasst = erfassteEintraege[i] || null;
+function formatDatum(iso: string): string {
+  const [y, m, d] = iso.split("-");
+  return `${d}.${m}.${y}`;
+}
 
-    const keineErfasst = ocr && !erfasst;
-    const keineOcr = !ocr && erfasst;
-    const startAbweichung =
-      ocr && erfasst ? zeitenWeichenAb(ocr.startzeit, erfasst.startzeit) : false;
-    const endAbweichung =
-      ocr && erfasst ? zeitenWeichenAb(ocr.endzeit, erfasst.endzeit) : false;
+export function AbgleichTabelle({ extrahierteZeilen, erfassteEintraege, onUebernehmen }: AbgleichTabelleProps) {
+  const [ausgewaehlt, setAusgewaehlt] = useState<Set<string>>(new Set());
+  const [saving, setSaving] = useState(false);
 
-    const hatAbweichung =
-      keineErfasst || keineOcr || startAbweichung || endAbweichung;
-    if (hatAbweichung) abweichungen++;
+  const erfasstByDatum = new Map(erfassteEintraege.map(e => [e.datum, e]));
+  const ocrByDatum = new Map(extrahierteZeilen.filter(z => z.datum).map(z => [z.datum!, z]));
 
-    return {
-      index: i,
-      ocr,
-      erfasst,
-      keineErfasst,
-      keineOcr,
-      startAbweichung,
-      endAbweichung,
-    };
-  });
+  const alleDaten = [...new Set([
+    ...extrahierteZeilen.map(z => z.datum).filter(Boolean) as string[],
+    ...erfassteEintraege.map(e => e.datum),
+  ])].sort();
 
-  if (maxRows === 0) {
+  if (alleDaten.length === 0) {
     return (
       <Card>
-        <CardHeader>
-          <CardTitle>Abgleich</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
-            Keine Daten zum Vergleichen vorhanden.
-          </p>
-        </CardContent>
+        <CardHeader><CardTitle>Abgleich</CardTitle></CardHeader>
+        <CardContent><p className="text-sm text-muted-foreground">Keine Daten vorhanden.</p></CardContent>
       </Card>
     );
   }
 
+  const zeilen = alleDaten.map(datum => {
+    const ocr = ocrByDatum.get(datum) ?? null;
+    const erfasst = erfasstByDatum.get(datum) ?? null;
+    const startAbw = abw(ocr?.startzeit, erfasst?.startzeit);
+    const endAbw = abw(ocr?.endzeit, erfasst?.endzeit);
+    const pauseAbw = ocr?.pauseBerechnet ? abw(ocr.pauseMinuten, erfasst?.pauseDauer, 5) : false;
+    const hatAbw = !ocr || !erfasst || startAbw || endAbw || pauseAbw;
+    const kannUebernehmen = !!(ocr && erfasst && hatAbw);
+    return { datum, ocr, erfasst, startAbw, endAbw, pauseAbw, hatAbw, kannUebernehmen };
+  });
+
+  const abweichungen = zeilen.filter(z => z.hatAbw).length;
+  const uebernehmbar = zeilen.filter(z => z.kannUebernehmen).map(z => z.datum);
+
+  function toggleAlle() {
+    if (ausgewaehlt.size === uebernehmbar.length) {
+      setAusgewaehlt(new Set());
+    } else {
+      setAusgewaehlt(new Set(uebernehmbar));
+    }
+  }
+
+  function toggle(datum: string) {
+    const neu = new Set(ausgewaehlt);
+    if (neu.has(datum)) neu.delete(datum);
+    else neu.add(datum);
+    setAusgewaehlt(neu);
+  }
+
+  async function handleUebernehmen() {
+    const eintraege: UebernahmeEintrag[] = [];
+    for (const datum of ausgewaehlt) {
+      const z = zeilen.find(z => z.datum === datum);
+      if (!z?.ocr || !z?.erfasst) continue;
+      eintraege.push({
+        id: z.erfasst.id,
+        datum,
+        startzeit: z.ocr.startzeit!,
+        endzeit: z.ocr.endzeit!,
+        pauseDauer: z.ocr.pauseBerechnet ? (z.ocr.pauseMinuten ?? z.erfasst.pauseDauer) : z.erfasst.pauseDauer,
+      });
+    }
+    setSaving(true);
+    try {
+      await onUebernehmen(eintraege);
+      setAusgewaehlt(new Set());
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const abwCell = "bg-yellow-50 text-yellow-900 dark:bg-yellow-950/30 dark:text-yellow-200 font-medium";
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Abgleich</CardTitle>
+        <CardTitle className="flex items-center justify-between">
+          <span>Abgleich</span>
+          {abweichungen === 0
+            ? <Badge variant="outline" className="text-green-600 border-green-300"><CheckCircle className="h-3 w-3 mr-1" />Alles stimmt</Badge>
+            : <Badge variant="destructive"><AlertTriangle className="h-3 w-3 mr-1" />{abweichungen} Abweichung{abweichungen !== 1 ? "en" : ""}</Badge>}
+        </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-10">#</TableHead>
-                <TableHead
-                  colSpan={2}
-                  className="border-r text-center font-semibold"
-                >
-                  Scan (OCR)
+                <TableHead className="w-8">
+                  {uebernehmbar.length > 0 && (
+                    <input type="checkbox"
+                      checked={ausgewaehlt.size === uebernehmbar.length && uebernehmbar.length > 0}
+                      onChange={toggleAlle}
+                      className="cursor-pointer"
+                      title="Alle auswählen"
+                    />
+                  )}
                 </TableHead>
-                <TableHead colSpan={2} className="text-center font-semibold">
-                  Erfasst
-                </TableHead>
+                <TableHead>Datum</TableHead>
+                <TableHead colSpan={3} className="border-r text-center font-semibold text-xs">Firma (Tachograph)</TableHead>
+                <TableHead colSpan={3} className="text-center font-semibold text-xs">Erfasst (App)</TableHead>
               </TableRow>
               <TableRow>
-                <TableHead className="w-10" />
-                <TableHead>Start</TableHead>
-                <TableHead className="border-r">Ende</TableHead>
-                <TableHead>Start</TableHead>
-                <TableHead>Ende</TableHead>
+                <TableHead />
+                <TableHead />
+                <TableHead className="text-xs">Start</TableHead>
+                <TableHead className="text-xs">Ende</TableHead>
+                <TableHead className="border-r text-xs">Pause</TableHead>
+                <TableHead className="text-xs">Start</TableHead>
+                <TableHead className="text-xs">Ende</TableHead>
+                <TableHead className="text-xs">Pause</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {zeilen.map((z) => {
-                let rowClass = "";
-                if (z.keineErfasst) rowClass = "bg-red-50 dark:bg-red-950/30";
-                else if (z.keineOcr) rowClass = "bg-orange-50 dark:bg-orange-950/30";
-
-                return (
-                  <TableRow key={z.index} className={rowClass}>
-                    <TableCell className="font-mono text-xs">
-                      {z.index + 1}
-                    </TableCell>
-                    <TableCell>
-                      {z.ocr?.startzeit || "-"}
-                    </TableCell>
-                    <TableCell className="border-r">
-                      {z.ocr?.endzeit || "-"}
-                    </TableCell>
-                    <TableCell
-                      className={
-                        z.startAbweichung
-                          ? "bg-yellow-50 text-yellow-900 dark:bg-yellow-950/30 dark:text-yellow-200"
-                          : ""
-                      }
-                    >
-                      {z.erfasst?.startzeit || "-"}
-                    </TableCell>
-                    <TableCell
-                      className={
-                        z.endAbweichung
-                          ? "bg-yellow-50 text-yellow-900 dark:bg-yellow-950/30 dark:text-yellow-200"
-                          : ""
-                      }
-                    >
-                      {z.erfasst?.endzeit || "-"}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
+              {zeilen.map(z => (
+                <TableRow
+                  key={z.datum}
+                  className={!z.ocr ? "bg-orange-50 dark:bg-orange-950/20" : !z.erfasst ? "bg-red-50 dark:bg-red-950/20" : ""}
+                >
+                  <TableCell>
+                    {z.kannUebernehmen && (
+                      <input type="checkbox"
+                        checked={ausgewaehlt.has(z.datum)}
+                        onChange={() => toggle(z.datum)}
+                        className="cursor-pointer"
+                      />
+                    )}
+                  </TableCell>
+                  <TableCell className="font-mono text-xs whitespace-nowrap">{formatDatum(z.datum)}</TableCell>
+                  <TableCell className={z.startAbw && z.erfasst ? abwCell : ""}>{z.ocr?.startzeit ?? "–"}</TableCell>
+                  <TableCell className={z.endAbw && z.erfasst ? abwCell : ""}>{z.ocr?.endzeit ?? "–"}</TableCell>
+                  <TableCell className={`border-r ${z.pauseAbw && z.erfasst ? abwCell : ""}`}>
+                    {z.ocr
+                      ? z.ocr.pauseBerechnet
+                        ? `${z.ocr.pauseMinuten} min`
+                        : <span className="text-muted-foreground text-xs">?</span>
+                      : "–"}
+                  </TableCell>
+                  <TableCell className={z.startAbw && z.ocr ? abwCell : ""}>{z.erfasst?.startzeit ?? "–"}</TableCell>
+                  <TableCell className={z.endAbw && z.ocr ? abwCell : ""}>{z.erfasst?.endzeit ?? "–"}</TableCell>
+                  <TableCell className={z.pauseAbw && z.ocr ? abwCell : ""}>
+                    {z.erfasst !== null ? `${z.erfasst.pauseDauer} min` : "–"}
+                  </TableCell>
+                </TableRow>
+              ))}
             </TableBody>
           </Table>
         </div>
 
-        {abweichungen > 0 ? (
-          <Alert variant="destructive">
-            <AlertDescription>
-              {abweichungen} Abweichung{abweichungen !== 1 ? "en" : ""} gefunden
-            </AlertDescription>
-          </Alert>
-        ) : (
-          <Alert className="border-green-200 bg-green-50 text-green-900 dark:border-green-800 dark:bg-green-950/30 dark:text-green-200">
-            <AlertDescription>Keine Abweichungen gefunden</AlertDescription>
-          </Alert>
+        {uebernehmbar.length > 0 && (
+          <div className="flex items-center gap-3 pt-2 border-t">
+            <p className="text-sm text-muted-foreground flex-1">
+              {ausgewaehlt.size === 0
+                ? "Wähle Einträge aus um sie mit den Firmendaten zu überschreiben."
+                : `${ausgewaehlt.size} Eintrag${ausgewaehlt.size !== 1 ? "e" : ""} ausgewählt`}
+            </p>
+            {ausgewaehlt.size > 0 && (
+              <Button onClick={handleUebernehmen} disabled={saving} variant="destructive" size="sm">
+                {saving ? "Wird gespeichert…" : `${ausgewaehlt.size} übernehmen`}
+              </Button>
+            )}
+          </div>
         )}
       </CardContent>
     </Card>
