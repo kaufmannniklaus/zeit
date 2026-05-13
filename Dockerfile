@@ -34,6 +34,10 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
+# pdf-parse + pdfjs-dist (serverExternalPackages – nicht gebündelt, muss explizit kopiert werden)
+COPY --from=builder /app/node_modules/pdf-parse ./node_modules/pdf-parse
+COPY --from=builder /app/node_modules/pdfjs-dist ./node_modules/pdfjs-dist
+
 EXPOSE 3001
 ENV PORT=3001
 ENV HOSTNAME="0.0.0.0"
